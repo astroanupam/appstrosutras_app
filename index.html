@@ -5018,6 +5018,893 @@ numAddTr([
 ["a collective emphasis on new starts and independent action","नई शुरुआत और स्वतंत्र कार्य पर सामूहिक बल","નવી શરૂઆત અને સ્વતંત્ર કાર્ય પર સામૂહિક ભાર"],["cooperation, diplomacy and waiting","सहयोग, कूटनीति और प्रतीक्षा","સહકાર, રાજદ્વારી અને પ્રતીક્ષા"],["communication, creativity and social activity","संवाद, सृजनात्मकता और सामाजिक गतिविधि","સંવાદ, સર્જનાત્મકતા અને સામાજિક પ્રવૃત્તિ"],["organization, structure and practical work","संगठन, संरचना और व्यावहारिक कार्य","સંગઠન, માળખું અને વ્યવહારુ કાર્ય"],["change, movement and flexibility","परिवर्तन, गति और लचीलापन","પરિવર્તન, ગતિ અને લવચીકતા"],["responsibility, community and family matters","उत्तरदायित्व, समुदाय और पारिवारिक विषय","જવાબદારી, સમુદાય અને પારિવારિક બાબતો"],["review, research and reflection","समीक्षा, शोध और चिंतन","સમીક્ષા, સંશોધન અને ચિંતન"],["management, finance and execution","प्रबंधन, वित्त और क्रियान्वयन","સંચાલન, નાણાં અને અમલ"],["completion, release and preparing a new cycle","पूर्णता, मुक्ति और नए चक्र की तैयारी","પૂર્ણતા, મુક્તિ અને નવા ચક્રની તૈયારી"]
 ]);
 Object.keys(NT_D).forEach(k=>{const o=NT_D[k];NT_D[k]=new Proxy(o,{get(t,p){const v=t[p];if(Array.isArray(v))return v.map(numTx);if(typeof v==='string')return numTx(v);return v}})});
+/* ============ TAJIK – ANNUAL HOROSCOPE & PREDICTIVE ENGINE (main menu › Tajik) ============
+   Reuses the shared ephemeris/chart engine (compute / getC / tropLon). Every disputed rule is a selectable preference; rules whose
+   formulation could not be verified are kept as RESEARCH PENDING. Calculation and wording are separate; wording is draft text. */
+const TJ7=['Sun','Moon','Mars','Mercury','Jupiter','Venus','Saturn'];
+const TJ_DEEP={Sun:15,Moon:12,Mars:8,Mercury:7,Jupiter:9,Venus:7,Saturn:9};
+const TJ_RANK=['Moon','Mercury','Venus','Sun','Mars','Jupiter','Saturn','Rahu','Ketu'];
+const TJ_BEN=['Jupiter','Venus','Mercury','Moon'];
+const TJ_TRI=[['Sun','Jupiter'],['Venus','Moon'],['Saturn','Mercury'],['Venus','Mars']];
+const TJ_DIGS={exalted:1,own:.9,friend:.7,neutral:.5,enemy:.3,debilitated:.1,'n/a':.5};
+const TJ_DEF={year:0,zod:'sid',ay:'chart',node:'chart',hs:'whole',loc:'birth',lat:'',lon:'',tz:'',dst:0,adj:0,adjwhy:'',
+ am:'sign',nodes:'n',uo:{},conj:'nature',cah:'#2e9d57',csh:'#3b82f6',cac:'#e8892b',csc:'#d64545',cno:'#9a9a9a',dn:'horizon',spd:'classical',
+ mc:'completed',moff:0,mdeg:'lagna',mw:{exalted:2,own:1.5,debilitated:-2,combust:-1,retro:-.5,dusthana:-1,benefic:1,malefic:-1,vfriend:1,venemy:-1,kendra:1},
+ sh30:'on',cusp:'equal',art:'ge',arRef:'alag',arSign:0,shSel:'punya',shUser:{},pf:'panch',dnr:'lum',vsOn:0,vsPl:'Jupiter',vsWhy:'',aonly:'n',
+ ds:'mudda',yl:'actual',dstart:'moon',dsp:'Ketu',w:[20,20,10,15,10,10,10,5],mo:'equal',ykH:7,rdAll:'y'};
+const TJ_RULES_NOTE='Rules are classed A classical documented · B school-specific · C research interpretation · D user-defined · E unverified. No primary text has been checked; every rule below is at best B/C.';
+function tjCfg(){if(!V.tjS){const st=(S.ui&&S.ui.tj)||{},d=JSON.parse(JSON.stringify(TJ_DEF)),s=JSON.parse(JSON.stringify(st));V.tjS=Object.assign({},d,s);['uo','mw','shUser'].forEach(k=>V.tjS[k]=Object.assign({},d[k],s[k]||{}));if(!Array.isArray(V.tjS.w)||V.tjS.w.length!==8)V.tjS.w=d.w}return V.tjS}
+function tjSave(){S.ui=S.ui||{};S.ui.tj=JSON.parse(JSON.stringify(V.tjS));save()}
+function tjSet(k,v){tjCfg()[k]=v;tjSave();render()}
+function tjSetN(o,k,v){tjCfg()[o][k]=v;tjSave();render()}
+function tjSetW(i,v){tjCfg().w[i]=+v||0;tjSave();render()}
+function tjGo(t){V.tjt=t;render()}
+function tjReset(){V.tjS=JSON.parse(JSON.stringify(TJ_DEF));tjSave();render()}
+const tjFix=(x,d)=>x==null||isNaN(x)?'–':(+x).toFixed(d==null?2:d);
+const tjDMS=x=>{const d=Math.floor(x),m=Math.floor((x-d)*60),s=Math.round(((x-d)*60-m)*60);return d+'°'+String(m).padStart(2,'0')+"'"+String(s).padStart(2,'0')+'"'};
+const tjLon=x=>SIGNS[Math.floor(x/30)].slice(0,3)+' '+tjDMS(x%30);
+function tjFmt(ms,tz){const d=new Date(ms+tz*3600000);return d.toISOString().slice(0,10)+' '+d.toISOString().slice(11,19)}
+function tjDay(ms,tz){return new Date(ms+tz*3600000).toISOString().slice(0,10)}
+/* ---- shared-engine bridge ---- */
+function tjChartObj(c,cfg,when){
+  const o=Object.assign({},c);if(cfg.node!=='chart')o.node=cfg.node;if(cfg.hs!=='chart')o.hs=cfg.hs;
+  if(cfg.zod==='trop'){const T=(when/86400000+2440587.5-2451545)/36525;o.ay='custom';o.ayCustom=-(1.3968877*T+0.00030707*T*T)}else if(cfg.ay!=='chart')o.ay=cfg.ay;
+  return o;
+}
+const tjMs=c=>{const [y,m,d]=c.date.split('-').map(Number),[h,mi]=c.time.split(':').map(Number);return Date.UTC(y,m-1,d,h,mi)-(c.tz+(c.dst||0))*3600000};
+function tjSpeed(n,ms,node){
+  const f=(a,b)=>{let d=a-b;if(d>180)d-=360;if(d<-180)d+=360;return d};
+  if(n==='Rahu'||n==='Ketu')return f(nodeTrop(ms+21600000,node||'mean'),nodeTrop(ms-21600000,node||'mean'))*2;
+  return f(tropLon(n,ms+21600000),tropLon(n,ms-21600000))*2;
+}
+function tjSunSid(ms,c,cfg){const T=(ms/86400000+2440587.5-2451545)/36525;return norm(tropLon('Sun',ms)-(cfg.zod==='trop'?0:ayanOf(tjChartObj(c,cfg,ms),T)))}
+function tjReturn(c,cfg,year,C0){
+  const target=C0.P.Sun.lon,[by,bm,bd]=c.date.split('-').map(Number),[hh,mm]=c.time.split(':').map(Number);
+  let ms=Date.UTC(year,bm-1,bd,hh,mm)-(c.tz+(c.dst||0))*3600000;const it=[];
+  for(let i=0;i<24;i++){let f=tjSunSid(ms,c,cfg)-target;if(f>180)f-=360;if(f<-180)f+=360;it.push(f);if(Math.abs(f)<1e-8)break;ms-=f/0.9856*86400000}
+  return {ms,target,iter:it,resid:it[it.length-1]};
+}
+function tjCalc(c0,cfg0){
+  const c=c0||curChart();if(!c)return null;const cfg=cfg0||tjCfg(),key=JSON.stringify([c,cfg]);if(!c0&&V.tjC&&V.tjC.key===key)return V.tjC;
+  const [by]=c.date.split('-').map(Number),year=cfg.year||new Date().getFullYear(),nodeT=cfg.node==='chart'?(c.node||'mean'):cfg.node,c0ms=tjMs(c);
+  const C0=getC(tjChartObj(c,cfg,c0ms)),R=tjReturn(c,cfg,year,C0),adjMs=R.ms+(+cfg.adj||0)*60000;
+  const tz=cfg.tz===''?c.tz:+cfg.tz,dst=cfg.dst===''?0:+cfg.dst,lat=cfg.loc==='birth'||cfg.lat===''?c.lat:+cfg.lat,lon=cfg.loc==='birth'||cfg.lon===''?c.lon:+cfg.lon;
+  const lms=Math.round((adjMs+(tz+dst)*3600000)/60000)*60000,L=new Date(lms);
+  const cA=Object.assign(tjChartObj(c,cfg,adjMs),{id:'tajik-annual',name:'Varshaphal '+year,date:L.toISOString().slice(0,10),time:L.toISOString().slice(11,16),tz,dst,lat,lon});
+  const CA=getC(cA),amsA=Date.UTC(L.getUTCFullYear(),L.getUTCMonth(),L.getUTCDate(),L.getUTCHours(),L.getUTCMinutes())-(tz+dst)*3600000;
+  const spdN={},spdA={};PLANETS.forEach(n=>{spdN[n]=tjSpeed(n,C0.ms,nodeT);spdA[n]=tjSpeed(n,amsA,nodeT)});
+  const done=cfg.mc==='completed'?year-by:year-by,comp=done+(+cfg.moff||0),mi=((C0.lagna+comp)%12+12)%12;
+  const nextR=tjReturn(c,cfg,year+1,C0),T={key,c,cfg,year,nodeT,N:C0,A:CA,cA,ret:R,adjMs,amsA,tz,dst,lat,lon,spdN,spdA,
+    muntha:{idx:mi,comp,done,deg:cfg.mdeg==='lagna'?C0.ascLon%30:0,lon:mi*30+(cfg.mdeg==='lagna'?C0.ascLon%30:0)},yearDays:(nextR.ms-R.ms)/86400000,nextMs:nextR.ms};
+  T.muntha.house=((mi-CA.lagna+12)%12)+1;T.muntha.lord=LORD[mi];
+  if(!c0)V.tjC=T;return T;
+}
+/* ---- helpers on a chart ---- */
+const tjHouse=(C,sign)=>((sign-C.lagna+12)%12)+1;
+const tjHL=(C,h)=>LORD[(C.lagna+h-1)%12];
+function tjDigOf(C,n){
+  if(n==='Rahu'||n==='Ketu')return 'n/a';const p=C.P[n];if(p.dig==='exalted'||p.dig==='debilitated'||p.dig==='own')return p.dig;
+  const L=LORD[p.sign];return NATF[n].includes(L)?'friend':(NATE[n]||[]).includes(L)?'enemy':'neutral';
+}
+function tjComb(C,n){if(!COMB[n])return false;const d=Math.abs(((C.P[n].lon-C.P.Sun.lon+540)%360)-180);return (180-d)<COMB[n]}
+function tjStrength(C,n){
+  let s=TJ_DIGS[tjDigOf(C,n)];if(tjComb(C,n))s-=.2;if(C.P[n].retro&&n!=='Rahu'&&n!=='Ketu')s-=.05;
+  const h=tjHouse(C,C.P[n].sign);if([1,4,5,7,9,10].includes(h))s+=.1;if([6,8,12].includes(h))s-=.1;return Math.max(0,Math.min(1,s));
+}
+const tjLords=(C,n)=>[1,2,3,4,5,6,7,8,9,10,11,12].filter(h=>tjHL(C,h)===n);
+const tjNak=lon=>NAKS[Math.floor(lon/(360/27))]+' '+(Math.floor((lon%(360/27))/(360/108))+1);
+/* ---- Tajik aspects ---- */
+const tjNorm180=x=>((x+540)%360)-180;
+function tjOrb(cfg,n){const u=cfg.uo&&cfg.uo[n];if(cfg.am==='user'&&u!==undefined&&u!=='')return +u;return TJ_DEEP[n]!=null?TJ_DEEP[n]:(cfg.nodes==='y'?(u!==undefined&&u!==''?+u:8):0)}
+function tjPlanetList(C,spd,cfg){return TJ7.concat(cfg.nodes==='y'?['Rahu','Ketu']:[]).map(n=>({n,lon:C.P[n].lon,sign:C.P[n].sign,deg:C.P[n].deg,retro:!!C.P[n].retro,spd:spd[n]}))}
+function tjFaster(a,b,cfg){return cfg.spd==='actual'?Math.abs(a.spd)>=Math.abs(b.spd):TJ_RANK.indexOf(a.n)<=TJ_RANK.indexOf(b.n)}
+function tjPair(a,b,cfg){
+  const mutual=(tjOrb(cfg,a.n)+tjOrb(cfg,b.n))/2;let theta=null,delta=null;
+  if(cfg.am==='sign'||cfg.am==='degree'){const k=((b.sign-a.sign)+12)%12;if([0,2,3,4,6,8,9,10].includes(k)){theta=tjNorm180(k*30);delta=tjNorm180(b.lon-a.lon-theta)}}
+  else{const sep=tjNorm180(b.lon-a.lon);let best=null;[0,60,-60,90,-90,120,-120,180].forEach(t=>{const d=tjNorm180(sep-t);if(best===null||Math.abs(d)<Math.abs(best[1]))best=[t,d]});theta=best[0];delta=best[1]}
+  if(theta===null)return {a:a.n,b:b.n,none:true};
+  const abs=Math.abs(theta),type=abs===0?'Conjunction':abs===60?'Sextile':abs===90?'Square':abs===120?'Trine':'Opposition',within=Math.abs(delta)<=mutual;
+  let nature=abs===60||abs===120?'harmonious':abs===0?(cfg.conj==='h'?'harmonious':cfg.conj==='c'?'challenging':(TJ_BEN.includes(a.n)&&TJ_BEN.includes(b.n)?'harmonious':'challenging')):'challenging';
+  const af=tjFaster(a,b,cfg),rate=cfg.spd==='actual'?b.spd-a.spd:(af?-1:1),app=within&&delta*rate<0,ra=b.spd-a.spd;
+  const perf=app&&Math.abs(ra)>1e-6?Math.abs(delta/ra):null;
+  return {a:a.n,b:b.n,theta,type,delta,mutual,within,nature,applying:app,perf,strength:within?Math.max(0,1-Math.abs(delta)/mutual):0,faster:af?a.n:b.n,slower:af?b.n:a.n};
+}
+function tjAspects(C,spd,cfg){const L=tjPlanetList(C,spd,cfg),out=[];for(let i=0;i<L.length;i++)for(let j=i+1;j<L.length;j++)out.push(tjPair(L[i],L[j],cfg));return out}
+const tjAKey=(P,a,b)=>P.find(x=>(x.a===a&&x.b===b)||(x.a===b&&x.b===a));
+const tjAColor=(cfg,p)=>!p||p.none||!p.within?cfg.cno:p.nature==='harmonious'?(p.applying?cfg.cah:cfg.csh):(p.applying?cfg.cac:cfg.csc);
+function tjAspText(T,p){
+  const C=T.A,cfg=T.cfg,fa=p.faster,sl=p.slower,lines=[];
+  const ctx=n=>n+' (house '+tjHouse(C,C.P[n].sign)+', '+SIGNS[C.P[n].sign]+', '+tjDigOf(C,n)+', rules houses '+(tjLords(C,n).join(', ')||'none')+')';
+  lines.push('Relationship: '+p.type+' ('+p.nature+'), '+(p.within?(p.applying?'applying':'separating'):'outside the orb')+'; the faster planet is '+fa+'.');
+  lines.push('Context – '+ctx(p.a)+'; '+ctx(p.b)+'.');
+  if(p.within)lines.push('Orb difference '+tjFix(Math.abs(p.delta))+'° of a permitted '+tjFix(p.mutual)+'°'+(p.perf?'; linear estimate of perfection in about '+tjFix(p.perf,1)+' days':'')+'.');
+  const ml=T.muntha.lord,involved=[];if(p.a===ml||p.b===ml)involved.push('one of the planets is the Muntha lord ('+ml+')');if(C.P[p.a].sign===T.muntha.idx||C.P[p.b].sign===T.muntha.idx)involved.push('one planet occupies the Muntha sign');
+  lines.push(involved.length?'Muntha link: '+involved.join('; ')+'.':'No direct Muntha link.');
+  lines.push('This reading depends on the houses, lordships and dignities above; the aspect is not interpreted on its own.');
+  return lines;
+}
+/* ---- yogas ---- */
+function tjPairOf(T,a,b){return tjAKey(T.asp,a,b)}
+function tjIth(T,a,b){const p=tjPairOf(T,a,b);if(!p||p.none||!p.within)return null;return {p,kind:p.applying?'Ithasala':'Isarpha',faster:p.faster,slower:p.slower}}
+function tjRadda(T,a,b){const C=T.A,r=[];[a,b].forEach(n=>{if(C.P[n].retro&&n!=='Rahu'&&n!=='Ketu')r.push(n+' is retrograde');if(tjComb(C,n))r.push(n+' is combust');if(tjDigOf(C,n)==='debilitated')r.push(n+' is debilitated');if([6,8,12].includes(tjHouse(C,C.P[n].sign)))r.push(n+' is in a dusthana ('+tjHouse(C,C.P[n].sign)+')')});return r}
+function tjYogas(T,la,lb){
+  const out=[],names=TJ7.concat(T.cfg.nodes==='y'?['Rahu','Ketu']:[]),why=[];
+  const pairs=T.asp.filter(p=>!p.none&&p.within);
+  const ith=pairs.map(p=>({name:p.applying?'Ithasala':'Isarpha',p,steps:[p.a+' and '+p.b+': '+p.type+' ('+p.nature+')','orb difference '+tjFix(Math.abs(p.delta))+'° ≤ permitted '+tjFix(p.mutual)+'°','faster planet '+p.faster+' is '+(p.applying?'behind (approaching)':'ahead (has passed)')+' the slower planet '+p.slower]}));
+  if(la&&lb&&la!==lb){
+    const pr=tjPairOf(T,la,lb),own=ith.find(x=>(x.p.a===la&&x.p.b===lb)||(x.p.a===lb&&x.p.b===la));
+    const kk={la,lb,pair:own||null,steps:[]};
+    if(own){kk.steps.push('Pair '+la+' – '+lb+': '+own.name+' (applying = Ithasala, separating = Isarpha).');
+      const rd=tjRadda(T,la,lb);kk.radda=rd;kk.steps.push(rd.length&&T.cfg.rdAll==='y'?'Radda conditions found: '+rd.join('; ')+' – the Ithasala is treated as broken under this rule set.':'No Radda condition found.');
+      const mo=['Moon'].filter(m=>m!==la&&m!==lb).map(m=>{const x=tjIth(T,m,la)||tjIth(T,m,lb);return x&&x.kind==='Ithasala'?m+' forms Ithasala with '+(tjIth(T,m,la)&&tjIth(T,m,la).kind==='Ithasala'?la:lb):null}).filter(Boolean);
+      kk.kamboola=own.name==='Ithasala'&&mo.length>0;kk.steps.push(own.name==='Ithasala'?(kk.kamboola?'Kamboola: the Moon joins the Ithasala ('+mo.join('; ')+').':'Kamboola not formed: the Moon does not form Ithasala with either planet.'):'Kamboola requires an Ithasala.');
+    }else{kk.steps.push('Pair '+la+' – '+lb+': no Ithasala or Isarpha (not in aspect within the orb or no sign relation).');
+      const third=names.filter(n=>n!==la&&n!==lb).map(n=>{const a=tjIth(T,n,la),b=tjIth(T,n,lb),ra=TJ_RANK.indexOf(n),rl=Math.max(TJ_RANK.indexOf(la),TJ_RANK.indexOf(lb)),rf=Math.min(TJ_RANK.indexOf(la),TJ_RANK.indexOf(lb));
+        const both=a&&b;return {n,nakta:both&&a.kind==='Ithasala'&&b.kind==='Ithasala'&&ra<rf&&T.cfg.spd!=='actual'?true:false,yamaya:both&&T.cfg.spd!=='actual'&&ra>rl&&(tjIth(T,la,n)||{}).kind==='Ithasala'&&(tjIth(T,lb,n)||{}).kind==='Ithasala',a,b}});
+      kk.nakta=third.filter(x=>x.nakta).map(x=>x.n);kk.yamaya=third.filter(x=>x.yamaya).map(x=>x.n);
+      kk.steps.push(kk.nakta.length?'Nakta: '+kk.nakta.join(', ')+' is faster than both and applies to both, carrying the light.':'Nakta not formed (no faster third planet applies to both).');
+      kk.steps.push(kk.yamaya.length?'Yamaya: '+kk.yamaya.join(', ')+' is slower than both and both apply to it.':'Yamaya not formed (no slower third planet receives both).');}
+    return {ith,key:kk};
+  }
+  return {ith,key:null};
+}
+/* ---- sahams ---- */
+function tjEval(T,expr,seen){
+  const parts=String(expr).replace(/\s+/g,'').match(/[+-]?[^+-]+/g);if(!parts)return {err:'empty formula'};let sum=0;const trace=[];
+  for(const p of parts){const sg=p[0]==='-'?-1:1,tok=p.replace(/^[+-]/,''),v=tjPoint(T,tok,seen);if(v==null)return {err:'unknown point '+tok,trace};sum+=sg*v;trace.push((sg<0?'− ':trace.length?'+ ':'')+tok+' ('+tjFix(v,4)+'°)')}
+  return {lon:norm(sum),raw:sum,trace};
+}
+function tjIsDay(T){
+  const C=T.A;if(T.cfg.dn==='sunrise'){try{const ob=new Astronomy.Observer(T.lat,T.lon,0),t0=Astronomy.MakeTime(new Date(T.amsA-86400000)),r=Astronomy.SearchRiseSet('Sun',ob,+1,t0,2),s=Astronomy.SearchRiseSet('Sun',ob,-1,t0,2);let rs=r.date.getTime(),ss=s.date.getTime();while(rs<T.amsA-86400000)rs+=86400000;if(ss<rs)ss+=0;const rr=[],all=[];for(let d=-1;d<=1;d++){const a=Astronomy.SearchRiseSet('Sun',ob,+1,Astronomy.MakeTime(new Date(T.amsA+d*86400000-43200000)),1),b=Astronomy.SearchRiseSet('Sun',ob,-1,Astronomy.MakeTime(new Date(T.amsA+d*86400000-43200000)),1);if(a&&b)all.push([a.date.getTime(),b.date.getTime()])}return all.some(([x,y])=>y>x&&T.amsA>=x&&T.amsA<y)||all.some(([x,y])=>T.amsA>=x&&T.amsA<x+86400000&&T.amsA<y)}catch(e){}}
+  return norm(C.P.Sun.lon-C.ascLon)>=180;
+}
+/* ---- Muntha ---- */
+const TJ_MH=['Personality, health, reputation and personal advancement','Wealth, family, speech and accumulated resources','Courage, communication, enterprise and siblings','Property, domestic environment, vehicles and emotional stability','Education, children, intelligence, speculation and creativity','Competition, debts, disease, disputes and service','Marriage, partnerships, agreements and public dealings','Obstacles, transformations, inheritance and uncertainties','Fortune, higher learning, father, teachers and long-distance travel','Profession, authority, recognition and achievements','Income, fulfilment of ambitions, networks and gains','Expenses, isolation, foreign residence, sleep and withdrawal'];
+function tjMuntha(T){
+  const C=T.A,m=T.muntha,ml=m.lord,w=T.cfg.mw,mods=[],vs=T.vs;let score=0;
+  const add=(k,txt)=>{const v=+w[k]||0;mods.push({k,txt,v});score+=v};
+  const dg=tjDigOf(C,ml);if(dg==='exalted')add('exalted','Muntha lord '+ml+' is exalted');if(dg==='own')add('own','Muntha lord '+ml+' is in its own sign');if(dg==='debilitated')add('debilitated','Muntha lord '+ml+' is debilitated');
+  if(tjComb(C,ml))add('combust','Muntha lord is combust');if(C.P[ml].retro&&ml!=='Rahu'&&ml!=='Ketu')add('retro','Muntha lord is retrograde');
+  const lh=tjHouse(C,C.P[ml].sign);if([6,8,12].includes(lh))add('dusthana','Muntha lord is in house '+lh+' (dusthana)');
+  if([1,4,5,7,9,10].includes(m.house))add('kendra','Muntha is in house '+m.house+' (kendra/trikona)');if([6,8,12].includes(m.house))add('dusthana','Muntha is in house '+m.house+' (dusthana)');
+  const on=PLANETS.filter(n=>C.P[n].sign===m.idx&&n!==ml),asp=TJ7.filter(n=>{const k=((C.P[n].sign-m.idx)+12)%12;return [2,3,4,6,8,9,10].includes(k)});
+  on.forEach(n=>add(TJ_BEN.includes(n)?'benefic':'malefic',n+' is conjunct Muntha'));asp.forEach(n=>add(TJ_BEN.includes(n)?'benefic':'malefic',n+' aspects Muntha (sign-based)'));
+  if(vs&&vs.pl&&vs.pl!==ml){const r=NATF[ml]&&NATF[ml].includes(vs.pl)?'vfriend':(NATE[ml]||[]).includes(vs.pl)?'venemy':null;if(r)add(r,'Muntha lord and Varshesha '+vs.pl+' are '+(r==='vfriend'?'natural friends':'natural enemies'))}
+  return {mods,score,on,asp,lordHouse:lh,dig:dg,label:score>=2?'favourable-leaning':score<=-2?'challenging-leaning':'mixed'};
+}
+/* ---- Argala ---- */
+function tjArgala(T,refSign){
+  const C=T.A,cfg=T.cfg,occ=s=>PLANETS.filter(n=>C.P[n].sign===s),res=[];
+  [[2,12,'2nd','12th'],[4,10,'4th','10th'],[11,3,'11th','3rd'],[5,9,'5th (secondary Argala)','9th']].forEach(([h,vh,hn,vn])=>{
+    const a=occ((refSign+h-1)%12),v=occ((refSign+vh-1)%12),A=a.length,Vn=v.length;
+    const obst=A>0&&(cfg.art==='ge'?Vn>=A:Vn>A);
+    res.push({argala:hn,vir:vn,aSign:(refSign+h-1)%12,vSign:(refSign+vh-1)%12,planets:a,vplanets:v,status:A===0?'none':obst?'obstructed':'effective',ben:a.filter(n=>TJ_BEN.includes(n)).length,mal:a.filter(n=>!TJ_BEN.includes(n)).length});
+  });
+  return res;
+}
+/* ---- Panchadhikari / Varshesha ---- */
+function tjCands(T){
+  const C=T.A,N=T.N,cfg=T.cfg,day=tjIsDay(T),tri=TJ_TRI[C.lagna%4][day?0:1];
+  const wd=['Sun','Moon','Mars','Mercury','Jupiter','Venus','Saturn'][new Date(T.adjMs+(T.tz+T.dst)*3600000).getUTCDay()];
+  if(cfg.pf==='spec')return [['Muntha lord',T.muntha.lord],['Varsha Lagna lord',LORD[C.lagna]],['Lord of the annual Sun sign',LORD[C.P.Sun.sign]],['Lord of the annual Moon sign',LORD[C.P.Moon.sign]]];
+  return [['Muntha lord',T.muntha.lord],['Janma Lagna lord (natal)',LORD[N.lagna]],['Varsha Lagna lord',LORD[C.lagna]],['Tri-rashi lord of the Varsha Lagna ('+(day?'day':'night')+')',tri],['Dina-ratri lord ('+(cfg.dnr==='lum'?(day?'Sun by day':'Moon by night'):'lord of the weekday')+')',cfg.dnr==='lum'?(day?'Sun':'Moon'):wd]];
+}
+function tjVarshesha(T){
+  const C=T.A,cfg=T.cfg,cands=tjCands(T),rows=[],sign0=C.lagna;
+  cands.forEach(([role,pl])=>{
+    const sg=C.P[pl].sign,k=((sg-sign0)+12)%12,asp=[0,2,3,4,6,8,9,10].includes(k),fr=[2,4,8,10].includes(k)||k===0,ok=asp&&(cfg.aonly!=='y'||[2,4,8,10].includes(k)||k===0);
+    rows.push({role,pl,house:tjHouse(C,sg),asp,k,ok,dig:tjDigOf(C,pl),str:tjStrength(C,pl),retro:C.P[pl].retro&&pl!=='Rahu'&&pl!=='Ketu',comb:tjComb(C,pl),lords:tjLords(C,pl),
+      why:ok?'aspects the Varsha Lagna (sign-based'+(k===0?', placed in the Lagna':'')+')':asp?'aspects the Lagna but is excluded by the friendly-aspect-only setting':'does not aspect the Varsha Lagna'});
+  });
+  let pick=null;const el=rows.filter(r=>r.ok).sort((a,b)=>b.str-a.str);
+  if(el.length)pick=el[0];
+  const manual=cfg.vsOn?{pl:cfg.vsPl,why:cfg.vsWhy}:null;
+  return {rows,pick,eligible:el,final:manual?manual.pl:pick?pick.pl:LORD[C.lagna],manual,source:manual?'Manual override (not a calculated result)':pick?'Strongest eligible Panchadhikari (strength = this app\'s dignity score, not Panchavargiya bala)':'No candidate aspects the Lagna; fallback to the Varsha Lagna lord'};
+}
+/* ---- dashas ---- */
+function tjDasha(T){
+  const C=T.A,cfg=T.cfg,Y=cfg.yl==='actual'?T.yearDays:+cfg.yl,ms0=T.adjMs,DAY=86400000;
+  const nl=360/27,ni=Math.floor(C.P.Moon.lon/nl),frac=(C.P.Moon.lon%nl)/nl;
+  if(cfg.ds==='mudda'){
+    const idx=cfg.dstart==='moon'?ni%9:DORD.indexOf(cfg.dsp),f=cfg.dstart==='moon'?frac:0,lenOf=p=>DY[p]*Y/120*DAY;
+    let start=ms0-f*lenOf(DORD[idx]);const out=[];
+    for(let i=0;i<9;i++){const lord=DORD[(idx+i)%9],len=lenOf(lord),ads=[];let s=start;for(let j=0;j<9;j++){const al=DORD[(idx+i+j)%9],l=len*DY[al]/120;ads.push({lord:al,start:s,end:s+l});s+=l}out.push({lord,start,end:start+len,ads});start+=len}
+    return {name:'Mudda (Vimshottari compressed to one year)',cls:'C',note:'Research interpretation: the Vimshottari periods scaled so that 120 years = one Varsha year; the first lord is that of the annual Moon nakshatra, with the balance taken from the Moon\'s position. Source not verified.',Y,list:out,start:ms0};
+  }
+  if(cfg.ds==='yogini'){
+    const YG=[['Mangala','Moon',1],['Pingala','Sun',2],['Dhanya','Jupiter',3],['Bhramari','Mars',4],['Bhadrika','Mercury',5],['Ulka','Saturn',6],['Siddha','Venus',7],['Sankata','Rahu',8]],tot=36;
+    const idx=cfg.dstart==='moon'?((ni+1+3)%8+8-1)%8:0,f=cfg.dstart==='moon'?frac:0,lenOf=y=>y*Y/tot*DAY;
+    let start=ms0-f*lenOf(YG[idx][2]);const out=[];
+    for(let i=0;i<8;i++){const g=YG[(idx+i)%8],len=lenOf(g[2]),ads=[];let s=start;for(let j=0;j<8;j++){const a=YG[(idx+i+j)%8],l=len*a[2]/tot;ads.push({lord:a[1],yogini:a[0],start:s,end:s+l});s+=l}out.push({lord:g[1],yogini:g[0],start:start,end:start+len,ads});start+=len}
+    return {name:'Yogini (scaled to one year)',cls:'C',note:'Research interpretation: the 36-year Yogini cycle scaled to one Varsha year; start by the annual Moon nakshatra ((nakshatra number + 3) mod 8). Source not verified.',Y,list:out,start:ms0};
+  }
+  return {name:'Patyayini',cls:'E',pending:true,note:'RESEARCH PENDING – no validated formula is loaded. Add one in the Dasha registry once the source is verified.',Y,list:[],start:ms0};
+}
+const tjDashaAt=(D,ms)=>{const md=D.list.find(m=>ms>=m.start&&ms<m.end);if(!md)return null;const ad=md.ads.find(a=>ms>=a.start&&ms<a.end);return {md,ad}};
+/* ---- prediction matrix ---- */
+const TJ_LAYERS=['Natal promise','Annual chart','Muntha','Varshesha','Saham','Tajik aspects and yogas','Dasha activation','Transit confirmation'];
+function tjHouseScore(C,hs){const v=hs.map(h=>tjStrength(C,tjHL(C,h)));return v.reduce((a,b)=>a+b,0)/v.length}
+function tjPredict(T,cat){
+  const [name,hs,kar,sh]=cat,N=T.N,A=T.A,vs=T.vsel,res=[],pos=[],neg=[];
+  const nat=tjHouseScore(N,hs),ann=tjHouseScore(A,hs);res.push({s:nat,t:'Natal lords of houses '+hs.join(', ')+': '+hs.map(h=>tjHL(N,h)+' '+tjDigOf(N,tjHL(N,h))).join('; ')});
+  res.push({s:ann,t:'Annual lords of houses '+hs.join(', ')+': '+hs.map(h=>tjHL(A,h)+' ('+tjDigOf(A,tjHL(A,h))+', house '+tjHouse(A,A.P[tjHL(A,h)].sign)+')').join('; ')});
+  let ms=T.mun.score>=2?.7:T.mun.score<=-2?.3:.5;if(hs.includes(T.muntha.house)){ms=Math.min(1,ms+.15);pos.push('Muntha is in house '+T.muntha.house+', which relates to '+name.toLowerCase())}
+  res.push({s:ms,t:'Muntha in house '+T.muntha.house+' ('+T.mun.label+'); Muntha lord '+T.muntha.lord});
+  let vsS=tjStrength(A,vs.final);if(hs.some(h=>tjHL(A,h)===vs.final)){vsS=Math.min(1,vsS+.15);pos.push('Varshesha '+vs.final+' rules a relevant house')}if(hs.includes(tjHouse(A,A.P[vs.final].sign)))vsS=Math.min(1,vsS+.1);
+  res.push({s:vsS,t:'Varshesha '+vs.final+' ('+tjDigOf(A,vs.final)+', house '+tjHouse(A,A.P[vs.final].sign)+')'});
+  const sr=tjSaham(T,sh);if(sr&&sr.lon!=null){let s=tjStrength(A,sr.disp);if([1,4,5,7,9,10].includes(sr.house))s=Math.min(1,s+.1);if([6,8,12].includes(sr.house))s=Math.max(0,s-.1);res.push({s,t:sr.name+' Saham in house '+sr.house+', dispositor '+sr.disp+' ('+tjDigOf(A,sr.disp)+')'})}else res.push({s:null,t:(sr?sr.name+' Saham: formula pending':'no Saham')+' – layer not evaluated'});
+  const lords=[...new Set(hs.map(h=>tjHL(A,h)).concat([kar]))].filter(n=>TJ7.includes(n)),ith=T.yg.ith.filter(y=>y.name==='Ithasala'&&(lords.includes(y.p.a)||lords.includes(y.p.b))),rad=ith.filter(y=>tjRadda(T,y.p.a,y.p.b).length),ch=T.asp.filter(p=>!p.none&&p.within&&p.nature==='challenging'&&(lords.includes(p.a)||lords.includes(p.b)));
+  const ts=Math.max(0,Math.min(1,.5+.12*(ith.length-rad.length)-.08*ch.filter(p=>p.applying).length));res.push({s:ts,t:'Ithasala involving relevant lords: '+ith.length+' (with Radda conditions: '+rad.length+'); applying challenging aspects: '+ch.filter(p=>p.applying).length});
+  const now=T.dashaNow;if(now){const lordsAll=new Set(hs.map(h=>tjHL(A,h)).concat([kar])),occ=new Set(PLANETS.filter(n=>hs.includes(tjHouse(A,A.P[n].sign)))),hit=[now.md.lord,now.ad.lord].filter(l=>lordsAll.has(l)||occ.has(l));
+    const s=hit.length?Math.min(1,.5+.2*hit.length+.1*(tjStrength(A,now.md.lord)-.5)):.4;res.push({s,t:'Active Dasha '+now.md.lord+' / '+now.ad.lord+(hit.length?' – '+hit.join(', ')+' linked to the relevant houses or karaka':' – no direct link to the relevant houses')});if(hit.length)pos.push('The active Dasha lord is linked to '+name.toLowerCase())}else res.push({s:null,t:'Dasha not available for the reference date'});
+  res.push({s:null,t:'Transit confirmation is not evaluated in this version (RESEARCH PENDING: transit rules not loaded)'});
+  const w=T.cfg.w,use=res.map((r,i)=>r.s==null?0:w[i]),tw=use.reduce((a,b)=>a+b,0),score=tw?res.reduce((a,r,i)=>a+(r.s==null?0:r.s*w[i]),0)/tw:null;
+  res.forEach((r,i)=>{if(r.s!=null)(r.s>=.6?pos:r.s<=.4?neg:[]).push(TJ_LAYERS[i]+': '+r.t)});
+  const ev=res.filter(r=>r.s!=null),agree=ev.filter(r=>r.s>=.6).length,dis=ev.filter(r=>r.s<=.4).length;
+  const conf=ev.length>=6&&(agree===0||dis===0)?'higher':ev.length>=5?'moderate':'low';
+  return {name,houses:hs,kar,res,score,pos,neg,conf,contra:agree>0&&dis>0,evaluated:ev.length};
+}
+function tjFull(c0,cfg0){
+  const T=tjCalc(c0,cfg0);if(!T)return null;const cfg=T.cfg;if(T.full)return T;T.full=true;
+  T.asp=tjAspects(T.A,T.spdA,cfg);T.aspN=tjAspects(T.N,T.spdN,cfg);T.vsel=tjVarshesha(T);T.vs={pl:T.vsel.final};T.mun=tjMuntha(T);
+  T.yg=tjYogas(T,LORD[T.A.lagna],tjHL(T.A,+cfg.ykH));T.dasha=tjDasha(T);T.dashaNow=tjDashaAt(T.dasha,Math.min(Math.max(Date.now(),T.adjMs),T.nextMs-1));
+  return T;
+}
+/* ============ TAJIK – interface, rule registry and tests ============ */
+const TJ_TABS=[['bp','Basic Parameters'],['as','Aspects'],['mu','Muntha'],['ar','Argala'],['sa','Sahams'],['vp','Varshaphal'],['pa','Panchadhikari'],['yo','Yogas'],['da','Dasha'],['tm','Timing'],['pm','Prediction Matrix'],['cm','Comparison'],['au','Research & Audit']];
+const TJ_NOTE='Wording: draft text composed by rules from the chart data. Interpretive indications only – not predictions.';
+const tjSel=(k,list,w)=>`<select ${w?'style="min-width:'+w+'px"':''} onchange="tjSet('${k}',this.value)">${opt(list,tjCfg()[k])}</select>`;
+const tjNum=(k,w)=>`<input value="${esc(tjCfg()[k])}" style="width:${w||80}px" onchange="tjSet('${k}',this.value)">`;
+const tjShow=(t,rows)=>`<details style="margin-top:6px"><summary class="mute" style="font-size:12px">Show formula / calculation</summary><div style="font-size:12px;margin-top:4px">${rows.map(r=>'<div>'+r+'</div>').join('')}</div></details>`;
+const tjPR=(T,C,spd,n)=>{const p=C.P[n];return {n,lon:p.lon,sign:p.sign,house:tjHouse(C,p.sign),nak:tjNak(p.lon),retro:p.retro&&n!=='Rahu'&&n!=='Ketu',spd:spd[n],dig:tjDigOf(C,n),disp:LORD[p.sign],comb:tjComb(C,n),str:tjStrength(C,n)}};
+function tjTransit(T){const now=new Date(),c=Object.assign(tjChartObj(T.c,T.cfg,now.getTime()),{id:'tj-now',name:'Transit',date:now.toISOString().slice(0,10),time:now.toISOString().slice(11,16),tz:0,dst:0,lat:T.lat,lon:T.lon}),C=getC(c),spd={};PLANETS.forEach(n=>spd[n]=tjSpeed(n,Date.now(),T.nodeT));return {C,spd,when:now}}
+function tjPlanetTable(T,C,spd,withNatal){
+  return `<div style="overflow-x:auto"><table style="font-size:13px"><tr><th>Planet</th><th>Longitude</th><th>Rashi</th><th>House</th><th>Nakshatra · Pada</th><th>Motion</th><th>Speed °/day</th><th>Dignity</th><th>Dispositor</th><th>Combustion</th><th>Strength (dignity score)</th>${withNatal?'<th>Annual vs natal sign</th>':''}</tr>${PLANETS.map(n=>{const r=tjPR(T,C,spd,n);return `<tr><td><b>${n}</b></td><td translate="no">${tjDMS(r.lon%30)} ${SIGNS[r.sign].slice(0,3)}</td><td>${SIGNS[r.sign]}</td><td>${r.house}</td><td translate="no">${r.nak}</td><td>${r.retro?'Retrograde':'Direct'}</td><td translate="no">${tjFix(r.spd,3)}</td><td>${r.dig}</td><td>${r.disp}</td><td>${r.comb?'Combust':'–'}</td><td translate="no">${tjFix(r.str)}</td>${withNatal?`<td translate="no">${SIGNS[T.N.P[n].sign].slice(0,3)} → ${SIGNS[r.sign].slice(0,3)}${T.N.P[n].sign===r.sign?' (same)':''}</td>`:''}</tr>`}).join('')}</table></div>`;
+}
+function tjConfigPanel(T,open){
+  const c=T.c,cfg=T.cfg,ays=[['chart','Same as the chart ('+((AYAN.find(a=>a.k===(c.ay||'lahiri'))||AYAN[0]).name)+')']].concat(AYAN.filter(a=>a.k!=='custom').map(a=>[a.k,a.name]));
+  return `<details class="card noprint" ${open?'open':''}><summary><b>Master configuration</b> <span class="mute">(saved with the annual chart · changes recalculate every tab)</span></summary>
+   <div class="row" style="margin-top:8px;gap:8px 12px"><label style="margin:0">Year of Varshaphal<br><input type="number" value="${T.year}" style="width:90px" onchange="tjSet('year',+this.value)"></label><label style="margin:0">Zodiac<br>${tjSel('zod',[['sid','Sidereal'],['trop','Tropical']])}</label><label style="margin:0">Ayanamsha<br>${tjSel('ay',ays,260)}</label><label style="margin:0">Rahu / Ketu<br>${tjSel('node',[['chart','Same as the chart'],['mean','Mean node'],['true','True node']])}</label><label style="margin:0">House system<br>${tjSel('hs',[['chart','Same as the chart'],['whole','Whole sign'],['equal','Equal house (Lagna in the middle)'],['equalstart','Equal house (Lagna at the start)']],240)}</label></div>
+   <div class="row" style="margin-top:8px;gap:8px 12px"><label style="margin:0">Annual return location<br>${tjSel('loc',[['birth','Birth place'],['custom','Custom location']])}</label>${cfg.loc==='custom'?`<label style="margin:0">Latitude<br>${tjNum('lat')}</label><label style="margin:0">Longitude<br>${tjNum('lon')}</label><label style="margin:0">Time zone (h)<br>${tjNum('tz',60)}</label><label style="margin:0">DST (h)<br>${tjNum('dst',60)}</label>`:`<span class="mute">lat ${tjFix(T.lat,3)} · lon ${tjFix(T.lon,3)} · UTC${T.tz>=0?'+':''}${T.tz}${T.dst?' + DST '+T.dst:''}</span>`}<label style="margin:0">Manual time correction (minutes)<br><input type="number" value="${cfg.adj}" style="width:90px" onchange="tjSet('adj',+this.value)"></label><label style="margin:0">Reason (audit record)<br><input value="${esc(cfg.adjwhy)}" style="width:200px" onchange="tjSet('adjwhy',this.value)"></label></div>
+   <div class="row" style="margin-top:8px;gap:8px 12px"><label style="margin:0">Aspect method<br>${tjSel('am',[['sign','Sign-based Tajik aspect (deeptamsa orbs)'],['exact','Exact longitudinal aspect (deeptamsa orbs)'],['user','User-defined orbs (exact longitude)'],['degree','Degree-based – RESEARCH PENDING (treated as sign-based)']],300)}</label><label style="margin:0">Nodes in aspects<br>${tjSel('nodes',[['n','Excluded'],['y','Included (user orb)']])}</label><label style="margin:0">Faster planet<br>${tjSel('spd',[['classical','Classical order (Moon, Mercury, Venus, Sun, Mars, Jupiter, Saturn)'],['actual','Actual daily speed']],360)}</label><label style="margin:0">Day / night<br>${tjSel('dn',[['horizon','Sun above the horizon (by longitude)'],['sunrise','Sunrise–sunset times']])}</label><label style="margin:0">Dignity convention<br><select disabled><option>Exalt / debil / own + natural friendship (other conventions pending)</option></select></label></div>
+   <div class="row" style="margin-top:8px"><button class="sm" onclick="tjReset()">Reset all preferences</button><button class="sm" onclick="tjSaveAn()">Save this analysis</button><button class="sm" onclick="tjExport()">Download JSON</button><button class="sm" onclick="window.print()">Print / PDF</button></div></details>`;
+}
+function tjSaveAn(){const T=tjFull();if(!T)return;S.ui=S.ui||{};S.ui.tjSaved=(S.ui.tjSaved||[]).concat([{id:'tj'+Date.now(),chart:T.c.name,year:T.year,when:new Date().toISOString(),ret:tjFmt(T.adjMs,T.tz),lagna:SIGNS[T.A.lagna],muntha:SIGNS[T.muntha.idx],varshesha:T.vsel.final,profile:JSON.parse(JSON.stringify(T.cfg))}]);save();render()}
+function tjExport(){const T=tjFull();if(!T)return;dl('appstrosutras-tajik-'+T.year+'.json',JSON.stringify({engine:'AppstroSutras Tajik',generated:new Date().toISOString(),chart:T.c.name,year:T.year,profile:T.cfg,return:{natalSun:T.ret.target,returnTime:tjFmt(T.adjMs,T.tz),zone:T.tz+T.dst,manualCorrectionMinutes:T.cfg.adj,reason:T.cfg.adjwhy},annual:{lagna:SIGNS[T.A.lagna],muntha:SIGNS[T.muntha.idx],varshesha:T.vsel.final,source:T.vsel.source},note:'Rules are unverified against primary sources. Not a prediction.'},null,2))}
+/* ---- tabs ---- */
+function tjTabBp(T){
+  const v=V.tjv||'annual',tr=v==='transit'?tjTransit(T):null,C=v==='natal'?T.N:v==='transit'?tr.C:T.A,spd=v==='natal'?T.spdN:v==='transit'?tr.spd:T.spdA,m=T.muntha,vs=T.vsel;
+  const lag=LORD[T.A.lagna],cand=tjCands(T);
+  return tjConfigPanel(T,true)+`<div class="card"><div class="row"><b>Planetary parameters</b><button class="${v==='natal'?'on':''}" onclick="V.tjv='natal';render()">Natal</button><button class="${v==='annual'?'on':''}" onclick="V.tjv='annual';render()">Varshaphal</button><button class="${v==='transit'?'on':''}" onclick="V.tjv='transit';render()">Transit (now)</button><span class="mute">Lagna ${tjLon(C.ascLon)} · ${SIGNS[C.lagna]}</span></div>${tjPlanetTable(T,C,spd,v==='annual')}
+   <p class="mute" style="margin:6px 0 0;font-size:12px">Strength is this app's dignity score (exaltation, own, natural friendship, combustion, retrogression, kendra/trikona versus dusthana) – not Shadbala and not Panchavargiya bala. Houses follow the whole-sign count from the chart's Lagna.</p></div>
+   <div class="card"><h3 style="margin-top:0">Annual parameters</h3><table style="font-size:13px"><tr><td class="mute" style="width:230px">Varsha Lagna / lord</td><td>${SIGNS[T.A.lagna]} · ${lag}</td></tr><tr><td class="mute">Muntha sign / house / lord</td><td>${SIGNS[m.idx]} · house ${m.house} · ${m.lord}</td></tr><tr><td class="mute">Varshesha</td><td>${vs.final} <span class="mute">(${vs.source})</span></td></tr><tr><td class="mute">Weekday lord (year lord by weekday)</td><td>${cand.length?['Sun','Moon','Mars','Mercury','Jupiter','Venus','Saturn'][new Date(T.adjMs+(T.tz+T.dst)*3600000).getUTCDay()]:''}</td></tr><tr><td class="mute">Month lord / Day lord</td><td><span class="mute">RESEARCH PENDING – the Tajik month-lord and day-lord rules are not loaded</span></td></tr><tr><td class="mute">Panchadhikari</td><td>${cand.map(c=>c[1]).join(', ')}</td></tr></table></div>
+   <div class="card"><h3 style="margin-top:0">Solar return</h3>${tjReturnTable(T)}</div>`;
+}
+function tjReturnTable(T){
+  const civ=Date.UTC(...T.c.date.split('-').map((x,i)=>i===1?+x-1:+x),...T.c.time.split(':').map(Number))-(T.c.tz+(T.c.dst||0))*3600000,civ2=civ+(T.year-+T.c.date.slice(0,4))*365.2425*86400000;
+  const resid=Math.abs(T.A.P.Sun.lon-T.N.P.Sun.lon)>180?360-Math.abs(T.A.P.Sun.lon-T.N.P.Sun.lon):Math.abs(T.A.P.Sun.lon-T.N.P.Sun.lon);
+  return `<table style="font-size:13px"><tr><td class="mute" style="width:260px">Natal Sun longitude</td><td translate="no">${tjLon(T.ret.target)} (${tjFix(T.ret.target,6)}°)</td></tr><tr><td class="mute">Annual return Sun longitude (chart)</td><td translate="no">${tjLon(T.A.P.Sun.lon)} (${tjFix(T.A.P.Sun.lon,6)}°)</td></tr><tr><td class="mute">Exact longitudinal difference</td><td translate="no">${tjFix(resid,6)}° <span class="mute">(the chart is built at the return time rounded to the minute; the solver itself converged to ${tjFix(Math.abs(T.ret.resid),9)}° in ${T.ret.iter.length} steps)</span></td></tr><tr><td class="mute">Annual return date and time (zone UTC${T.tz+T.dst>=0?'+':''}${T.tz+T.dst})</td><td translate="no"><b>${tjFmt(T.adjMs,T.tz+T.dst)}</b>${T.cfg.adj?' <span class="mute">(includes a manual correction of '+T.cfg.adj+' min: '+esc(T.cfg.adjwhy||'no reason given')+')</span>':''}</td></tr><tr><td class="mute">Difference from the civil birthday and time</td><td translate="no">${tjFix((T.adjMs-Date.UTC(T.year,+T.c.date.slice(5,7)-1,+T.c.date.slice(8,10),+T.c.time.slice(0,2),+T.c.time.slice(3,5))+(T.c.tz+(T.c.dst||0))*3600000)/3600000,2)} hours</td></tr><tr><td class="mute">Length of this Varsha year</td><td translate="no">${tjFix(T.yearDays,5)} days</td></tr></table>`;
+}
+function tjTabAs(T){
+  const cfg=T.cfg,v=V.tjav||'annual',P=v==='natal'?T.aspN:T.asp,names=TJ7.concat(cfg.nodes==='y'?['Rahu','Ketu']:[]),sel=V.tjP,C=v==='natal'?T.N:T.A;
+  const orbs=`<div class="row" style="gap:8px 12px">${TJ7.concat(cfg.nodes==='y'?['Rahu','Ketu']:[]).map(n=>`<label style="margin:0">${n}<br><input value="${esc(cfg.uo[n]!=null?cfg.uo[n]:(TJ_DEEP[n]!=null?TJ_DEEP[n]:8))}" style="width:56px" ${cfg.am==='user'||n==='Rahu'||n==='Ketu'?'':'disabled'} onchange="tjSetN('uo','${n}',this.value)"></label>`).join('')}</div>`;
+  const cell=(a,b)=>{if(a===b)return '<td style="background:var(--bg)"></td>';const p=tjAKey(P,a,b),col=tjAColor(cfg,p),ok=p&&!p.none&&p.within;return `<td style="text-align:center;padding:4px 6px;cursor:${ok?'pointer':'default'};background:${ok?col:'transparent'};color:${ok?'#fff':'var(--mute)'};border:1px solid var(--line);${sel&&((sel[0]===a&&sel[1]===b)||(sel[0]===b&&sel[1]===a))?'outline:2px solid #c9a227;':''}" ${ok?`onclick="V.tjP=['${a}','${b}'];render()"`:''} title="${ok?p.type+' '+tjFix(Math.abs(p.delta))+'° / '+tjFix(p.mutual)+'°':'no aspect within orb'}">${ok?p.type.slice(0,3)+' '+tjFix(Math.abs(p.delta),1)+'°'+(p.applying?'▸':'◂'):'·'}</td>`};
+  const list=P.filter(p=>!p.none&&p.within).sort((x,y)=>Math.abs(x.delta)-Math.abs(y.delta));
+  const sp=sel&&tjAKey(P,sel[0],sel[1]);
+  return `<div class="card"><div class="row"><b>Tajik aspects</b><button class="${v==='annual'?'on':''}" onclick="V.tjav='annual';render()">Varshaphal chart</button><button class="${v==='natal'?'on':''}" onclick="V.tjav='natal';render()">Natal chart</button></div>
+   <div class="row" style="margin-top:8px;gap:8px 12px"><label style="margin:0">Aspect method<br>${tjSel('am',[['sign','Sign-based Tajik (deeptamsa orbs)'],['exact','Exact longitudinal (deeptamsa orbs)'],['user','User-defined orbs'],['degree','Degree-based – RESEARCH PENDING']],260)}</label><label style="margin:0">Nodes<br>${tjSel('nodes',[['n','Excluded'],['y','Included']])}</label><label style="margin:0">Conjunction nature<br>${tjSel('conj',[['nature','By planetary nature'],['h','Always harmonious'],['c','Always challenging']])}</label><label style="margin:0">Faster planet<br>${tjSel('spd',[['classical','Classical order'],['actual','Actual speed']])}</label></div>
+   <p class="mute" style="margin:8px 0 4px;font-size:12px">Orbs (°) per planet. The permitted orb for a pair is half the sum of the two planets' orbs. Default orbs are the classical deeptamsa values (Sun 15, Moon 12, Mars 8, Mercury 7, Jupiter 9, Venus 7, Saturn 9 – commonly cited; not verified against a primary text). Rahu and Ketu have no classical orb.</p>${orbs}
+   <div class="row" style="margin-top:8px;gap:8px 14px"><span class="mute">Colours:</span><label style="margin:0;display:inline">Applying harmonious <input type="color" value="${cfg.cah}" onchange="tjSet('cah',this.value)"></label><label style="margin:0;display:inline">Separating harmonious <input type="color" value="${cfg.csh}" onchange="tjSet('csh',this.value)"></label><label style="margin:0;display:inline">Applying challenging <input type="color" value="${cfg.cac}" onchange="tjSet('cac',this.value)"></label><label style="margin:0;display:inline">Separating challenging <input type="color" value="${cfg.csc}" onchange="tjSet('csc',this.value)"></label><label style="margin:0;display:inline">No aspect <input type="color" value="${cfg.cno}" onchange="tjSet('cno',this.value)"></label></div></div>
+   <div class="card"><h3 style="margin-top:0">Aspect matrix <span class="mute" style="font-weight:400;font-size:13px">(▸ applying · ◂ separating; click a cell)</span></h3><div style="overflow-x:auto"><table style="border-collapse:collapse"><tr><th></th>${names.map(n=>`<th>${n.slice(0,3)}</th>`).join('')}</tr>${names.map(a=>`<tr><th>${a.slice(0,3)}</th>${names.map(b=>cell(a,b)).join('')}</tr>`).join('')}</table></div>
+   <p class="mute" style="margin:6px 0 0;font-size:12px">The matrix is symmetric: a Tajik aspect works both ways, so the same relationship appears in both cells. Green = applying harmonious · blue = separating harmonious · orange = applying challenging · red = separating challenging · grey = none (colours are configurable above).</p></div>
+   <div class="card"><div style="overflow-x:auto"><table style="font-size:13px"><tr><th>Planets</th><th>Aspect</th><th>Nature</th><th>Separation (ideal ± orb)</th><th>Status</th><th>Faster</th><th>Strength</th><th>Perfection (linear estimate)</th></tr>${list.map(p=>`<tr style="cursor:pointer" onclick="V.tjP=['${p.a}','${p.b}'];render()"><td>${p.a} – ${p.b}</td><td>${p.type}</td><td style="color:${tjAColor(cfg,p)};font-weight:700">${p.nature}</td><td translate="no">${tjFix(Math.abs(p.theta))}° ${p.delta>=0?'+':'−'} ${tjFix(Math.abs(p.delta))}° (permitted ${tjFix(p.mutual)}°)</td><td>${p.applying?'Applying':'Separating'}</td><td>${p.faster}</td><td translate="no">${tjFix(p.strength)}</td><td translate="no">${p.perf?tjDay(T.adjMs+p.perf*86400000,T.tz+T.dst):'–'}</td></tr>`).join('')||'<tr><td colspan="8" class="mute">No aspect within orb.</td></tr>'}</table></div></div>
+   ${sp&&!sp.none?`<div class="card"><h3 style="margin-top:0">${sp.a} – ${sp.b}</h3><ul style="margin:0 0 0 18px;font-size:13px">${tjAspText(T,sp).map(x=>'<li>'+esc(x)+'</li>').join('')}</ul>${tjShow(T,['Planet A longitude = '+tjFix(C.P[sp.a].lon,4)+'°','Planet B longitude = '+tjFix(C.P[sp.b].lon,4)+'°','Selected aspect = '+sp.type+' ('+sp.theta+'°)','Orb difference = |'+tjFix(sp.delta,4)+'|° versus permitted '+tjFix(sp.mutual,2)+'°','Applying / separating = '+(sp.applying?'applying':'separating')+' (method: '+cfg.spd+' speeds)'])}<p class="mute" style="margin:6px 0 0;font-size:12px">${TJ_NOTE}</p></div>`:''}`;
+}
+function tjTabMu(T){
+  const m=T.muntha,C=T.A,mu=T.mun,cfg=T.cfg;
+  return `<div class="card"><h3 style="margin-top:0">Muntha</h3><div class="row" style="gap:8px 12px"><label style="margin:0">Completed-years convention<br>${tjSel('mc',[['completed','Completed years = Varsha year − birth year']])}</label><label style="margin:0">Offset (years)<br><input type="number" value="${cfg.moff}" style="width:70px" onchange="tjSet('moff',+this.value)"></label><label style="margin:0">Muntha degree<br>${tjSel('mdeg',[['lagna','Same degree as the natal Lagna'],['zero','Start of the sign']])}</label></div>
+   <table style="font-size:13px;margin-top:8px"><tr><td class="mute" style="width:230px">Natal Ascendant</td><td>${SIGNS[T.N.lagna]} (index ${T.N.lagna}) ${tjLon(T.N.ascLon)}</td></tr><tr><td class="mute">Completed age</td><td>${m.done}${cfg.moff?' + offset '+cfg.moff+' = '+m.comp:''}</td></tr><tr><td class="mute">Muntha sign / degree</td><td><b>${SIGNS[m.idx]}</b> ${tjDMS(m.deg)}</td></tr><tr><td class="mute">Muntha house in the annual chart</td><td><b>${m.house}</b></td></tr><tr><td class="mute">Muntha lord / its house / dignity</td><td>${m.lord} · house ${mu.lordHouse} · ${mu.dig}</td></tr><tr><td class="mute">Planets conjunct Muntha</td><td>${mu.on.join(', ')||'none'}</td></tr><tr><td class="mute">Planets aspecting Muntha (sign-based)</td><td>${mu.asp.join(', ')||'none'}</td></tr><tr><td class="mute">Muntha lord and Varshesha</td><td>${m.lord} / ${T.vsel.final}${m.lord===T.vsel.final?' (the same planet)':''}</td></tr></table>
+   ${tjShow(T,['Muntha index = (natal Ascendant index + completed years) mod 12','= ('+T.N.lagna+' + '+m.comp+') mod 12 = '+m.idx,'Result = '+SIGNS[m.idx]])}</div>
+   <div class="card"><h3 style="margin-top:0">Modifiers and weighted reading <span class="mute" style="font-weight:400;font-size:13px">(weights are editable software defaults, not classical values)</span></h3>
+   <div class="row" style="gap:8px 12px">${Object.keys(cfg.mw).map(k=>`<label style="margin:0">${k}<br><input type="number" step="0.5" value="${cfg.mw[k]}" style="width:64px" onchange="tjSetN('mw','${k}',+this.value)"></label>`).join('')}</div>
+   <table style="font-size:13px;margin-top:8px"><tr><th>Condition found</th><th>Weight</th></tr>${mu.mods.map(x=>`<tr><td>${esc(x.txt)}</td><td>${x.v>0?'+':''}${x.v}</td></tr>`).join('')||'<tr><td colspan="2" class="mute">No modifier applies.</td></tr>'}<tr><td><b>Total</b></td><td><b>${mu.score>0?'+':''}${tjFix(mu.score,1)}</b> – ${mu.label}</td></tr></table>
+   <p class="mute" style="margin:6px 0 0;font-size:12px">The total is an indication from the weights above and never a prediction from the Muntha placement alone. ${TJ_NOTE}</p></div>
+   <div class="card"><h3 style="margin-top:0">Muntha in each house</h3><table style="font-size:13px">${TJ_MH.map((t,i)=>`<tr style="${i+1===m.house?'background:var(--acc2);font-weight:700':''}"><td style="width:90px">House ${i+1}</td><td>${t}</td></tr>`).join('')}</table></div>`;
+}
+function tjTabAr(T){
+  const C=T.A,cfg=T.cfg,opts=[['alag','Annual Lagna'],['nlag','Natal Lagna'],['mun','Muntha'],['vs','Varshesha'],['pl','A planet'],['sg','A sign']];
+  let ref=cfg.arRef==='nlag'?T.N.lagna:cfg.arRef==='mun'?T.muntha.idx:cfg.arRef==='vs'?C.P[T.vsel.final].sign:cfg.arRef==='pl'?C.P[cfg.arPl||'Sun'].sign:cfg.arRef==='sg'?+cfg.arSign:C.lagna;
+  if(V.tjAs!=null)ref=V.tjAs;const A=tjArgala(T,ref),occ=s=>PLANETS.filter(n=>C.P[n].sign===s);
+  const hmap={};A.forEach(a=>{hmap[a.aSign]=(hmap[a.aSign]||'')+'A';hmap[a.vSign]=(hmap[a.vSign]||'')+'V'});
+  const box=s=>{const h=hmap[s]||'',isA=h.includes('A')&&!h.includes('V'),isV=h.includes('V')&&!h.includes('A'),both=h.includes('A')&&h.includes('V');return `<div style="border:2px solid ${s===ref?'#c9a227':'var(--line)'};border-radius:8px;padding:6px;min-width:110px;cursor:pointer;background:${both?'repeating-linear-gradient(45deg,#2e9d5744,#2e9d5744 6px,#d6454544 6px,#d6454544 12px)':isA?'#2e9d5744':isV?'#d6454544':'var(--card)'}" onclick="V.tjAs=${s};render()"><div class="mute" style="font-size:11px">${SIGNS[s]}${s===ref?' (reference)':''}</div><div style="font-weight:700">${occ(s).map(n=>AB[n]).join(' ')||'·'}</div></div>`};
+  return `<div class="card"><h3 style="margin-top:0">Argala <span class="mute" style="font-weight:400;font-size:13px">(a Jaimini-derived layer, not a compulsory Tajik doctrine)</span></h3><div class="row" style="gap:8px 12px"><label style="margin:0">Mode<br><select onchange="V.tjAm=this.value;render()"><option value="rashi" ${V.tjAm!=='off'?'selected':''}>Jaimini rashi-based Argala</option><option value="off" ${V.tjAm==='off'?'selected':''}>Disable Argala in the Tajik synthesis</option><option disabled>Classical Parashari/Jaimini profile – RESEARCH PENDING</option><option disabled>User-defined research profile – RESEARCH PENDING</option></select></label><label style="margin:0">Reference<br>${tjSel('arRef',opts)}</label>${cfg.arRef==='pl'?`<label style="margin:0">Planet<br><select onchange="tjSet('arPl',this.value)">${opt(PLANETS.map(p=>[p,p]),cfg.arPl||'Sun')}</select></label>`:''}${cfg.arRef==='sg'?`<label style="margin:0">Sign<br><select onchange="tjSet('arSign',+this.value)">${opt(SIGNS.map((s,i)=>[i,s]),+cfg.arSign)}</select></label>`:''}<label style="margin:0">Obstruction rule<br>${tjSel('art',[['ge','Virodhargala planets ≥ Argala planets obstruct'],['gt','Only more Virodhargala planets obstruct']],300)}</label><button class="sm" onclick="V.tjAs=null;render()">Use the chosen reference</button></div>
+   <p class="mute" style="margin:6px 0 0;font-size:12px">Which tie rule is classical is disputed, so both are selectable. The special treatment of the 3rd/9th positions and the strength-of-Argala rules are RESEARCH PENDING and are not applied; only planet counts and benefic/malefic nature are shown.</p></div>
+   ${V.tjAm==='off'?'<div class="card mute">Argala is disabled in this synthesis.</div>':`<div class="card"><div class="row" style="gap:6px;flex-wrap:wrap"><span style="width:100%" class="mute">Click a sign to analyse Argala from it. Green = Argala house · red = Virodhargala house.</span>${[0,1,2,3,4,5,6,7,8,9,10,11].map(box).join('')}</div></div>
+   <div class="card"><h3 style="margin-top:0">Reference: ${SIGNS[ref]}</h3><table style="font-size:13px"><tr><th>Argala house</th><th>Planets</th><th>Virodhargala house</th><th>Obstructing planets</th><th>Relative strength (benefic / malefic)</th><th>Final status</th></tr>${A.map(a=>`<tr><td>${a.argala} (${SIGNS[a.aSign]})</td><td>${a.planets.join(', ')||'–'}</td><td>${a.vir} (${SIGNS[a.vSign]})</td><td>${a.vplanets.join(', ')||'–'}</td><td>${a.planets.length} (${a.ben} / ${a.mal})</td><td><b style="color:${a.status==='effective'?'var(--ok)':a.status==='obstructed'?'var(--bad)':'var(--mute)'}">${a.status}</b></td></tr>`).join('')}</table>${tjShow(T,['Argala positions counted from the reference sign: 2nd, 4th, 11th and 5th (secondary)','Virodhargala positions: 12th, 10th, 3rd and 9th respectively','Status = obstructed if the Virodhargala planet count '+(cfg.art==='ge'?'≥':'>')+' the Argala planet count'])}</div>`}`;
+}
+function tjShU(id,k,v){const s=tjCfg();s.shUser[id]=Object.assign({},s.shUser[id]);s.shUser[id][k]=v;tjSave();render()}
+function tjChartSvg(T,C,title,opt){
+  const it=chartItems(C,'D1');
+  if(opt&&opt.muntha)it[T.muntha.idx].push('Mn');
+  if(opt&&opt.saham)TJ_SH.forEach(s=>{const r=tjSaham(T,s.id);if(r&&r.lon!=null)it[r.sign].push('·'+s.name.slice(0,2))});
+  return vvChart(it,C.lagna,title);
+}
+function tjTabVp(T){
+  const o={muntha:V.tjMu!=='n',saham:V.tjSh==='y'},c=T.cfg;
+  return `<div class="card"><div class="row"><b>Varshaphal chart – ${T.year}</b><span class="mute" translate="no">${tjFmt(T.adjMs,T.tz+T.dst)} · ${SIGNS[T.A.lagna]} Lagna</span><span style="margin-left:auto">Style: <button class="sm ${V.style==='south'?'on':''}" onclick="V.style='south';render()">South Indian</button> <button class="sm ${V.style==='north'?'on':''}" onclick="V.style='north';render()">North Indian</button></span></div>
+   <div class="row" style="margin-top:6px"><label style="display:inline;margin:0"><input type="checkbox" ${o.muntha?'checked':''} onchange="V.tjMu=this.checked?'y':'n';render()"> Highlight Muntha (Mn)</label><label style="display:inline;margin:0"><input type="checkbox" ${o.saham?'checked':''} onchange="V.tjSh=this.checked?'y':'n';render()"> Show Saham positions (·)</label></div>
+   <div class="row" style="align-items:flex-start;gap:16px;margin-top:8px"><div style="max-width:420px;flex:1;min-width:280px">${tjChartSvg(T,T.A,'Varshaphal D1',o)}</div><div style="flex:1;min-width:280px">${tjHouseTable(T)}</div></div></div>
+   <div class="card">${tjPlanetTable(T,T.A,T.spdA,true)}</div>`;
+}
+function tjHouseTable(T){
+  const C=T.A,asp=T.asp;
+  return `<div style="overflow-x:auto"><table style="font-size:12px"><tr><th>House</th><th>Sign</th><th>Lord</th><th>Occupants</th><th>Natal promise</th></tr>${[1,2,3,4,5,6,7,8,9,10,11,12].map(h=>{const s=(C.lagna+h-1)%12,l=LORD[s],occ=PLANETS.filter(n=>C.P[n].sign===s),nh=tjHouse(T.N,T.N.P[l].sign);return `<tr style="${h===T.muntha.house?'background:var(--acc2)':''}"><td>${h}${h===T.muntha.house?' (Muntha)':''}</td><td>${SIGNS[s].slice(0,3)}</td><td>${l} ${tjDigOf(C,l)}, in ${tjHouse(C,C.P[l].sign)}</td><td>${occ.map(n=>AB[n]).join(' ')||'·'}</td><td class="mute">${tjHL(T.N,h)} ${tjDigOf(T.N,tjHL(T.N,h))}</td></tr>`}).join('')}</table></div>`;
+}
+function tjTabPa(T){
+  const v=T.vsel,cfg=T.cfg;
+  return `<div class="card"><h3 style="margin-top:0">Panchadhikari and Varshesha</h3><div class="row" style="gap:8px 12px"><label style="margin:0">Candidate list<br>${tjSel('pf',[['panch','Traditional five Panchadhikaris'],['spec','Muntha lord, Lagna lord, annual Sun-sign lord, Moon-sign lord']],360)}</label><label style="margin:0">Dina-ratri lord<br>${tjSel('dnr',[['lum','Sun by day, Moon by night'],['wd','Lord of the weekday']])}</label><label style="margin:0">Aspect required<br>${tjSel('aonly',[['n','Any Tajik aspect or conjunction with the Lagna'],['y','Friendly aspect or presence in the Lagna only']],320)}</label></div>
+   <p class="mute" style="margin:6px 0 0;font-size:12px">The candidate list and hierarchy are not identical in every text. Strength is this app's dignity score; Panchavargiya bala (needs the Tajik hadda tables) is RESEARCH PENDING. The tri-rashi lords follow the common triplicity table (fire: Sun/Jupiter, earth: Venus/Moon, air: Saturn/Mercury, water: Venus/Mars).</p></div>
+   <div class="card"><div style="overflow-x:auto"><table style="font-size:13px"><tr><th>Role</th><th>Planet</th><th>House</th><th>Dignity</th><th>Ruled houses</th><th>Retro / combust</th><th>Strength</th><th>Eligibility</th></tr>${v.rows.map(r=>`<tr style="${v.pick&&v.pick.pl===r.pl&&v.pick.role===r.role?'background:var(--acc2);font-weight:700':''}"><td>${r.role}</td><td>${r.pl}</td><td>${r.house}</td><td>${r.dig}</td><td>${r.lords.join(', ')||'–'}</td><td>${r.retro?'R ':''}${r.comb?'combust':''}${!r.retro&&!r.comb?'–':''}</td><td translate="no">${tjFix(r.str)}</td><td class="${r.ok?'ok':'bad'}">${r.ok?'eligible':'rejected'} – ${esc(r.why)}</td></tr>`).join('')}</table></div></div>
+   <div class="card"><h3 style="margin-top:0">Decision trace</h3><ol style="margin:0 0 0 18px;font-size:13px"><li>Eligible candidates: ${v.eligible.map(r=>r.pl+' ('+r.role+')').join('; ')||'none'}</li><li>Rejected candidates: ${v.rows.filter(r=>!r.ok).map(r=>r.pl+' ('+r.role+') – '+r.why).join('; ')||'none'}</li><li>Relative strength: ${v.eligible.map(r=>r.pl+' '+tjFix(r.str)).join(', ')||'–'}</li><li>Final Varshesha: <b>${v.final}</b></li><li>Rule applied: ${esc(v.source)}</li></ol>
+   <h4 style="margin:10px 0 4px">Manual override <span class="mute" style="font-weight:400">(marked as manual, not calculated)</span></h4><div class="row"><label style="display:inline;margin:0"><input type="checkbox" ${cfg.vsOn?'checked':''} onchange="tjSet('vsOn',this.checked?1:0)"> Use a manual Varshesha</label><select onchange="tjSet('vsPl',this.value)">${opt(TJ7.map(p=>[p,p]),cfg.vsPl)}</select><input value="${esc(cfg.vsWhy)}" placeholder="Reason (audit record)" style="width:260px" onchange="tjSet('vsWhy',this.value)"></div>
+   <h4 style="margin:10px 0 4px">Varshesha ${v.final} – reading</h4><p style="margin:0;font-size:13px">${v.final} is in house ${tjHouse(T.A,T.A.P[v.final].sign)} (${SIGNS[T.A.P[v.final].sign]}), ${tjDigOf(T.A,v.final)}, ruling houses ${tjLords(T.A,v.final).join(', ')||'none'} of the annual chart. Muntha lord ${T.muntha.lord}: ${NATF[v.final]&&NATF[v.final].includes(T.muntha.lord)?'friendly':(NATE[v.final]||[]).includes(T.muntha.lord)?'inimical':'neutral or not defined'} to the Varshesha. Natal position: ${SIGNS[T.N.P[v.final].sign]}, house ${tjHouse(T.N,T.N.P[v.final].sign)}, ${tjDigOf(T.N,v.final)}. ${TJ_NOTE}</p></div>`;
+}
+function tjTabYo(T){
+  const cfg=T.cfg,y=T.yg,k=y.key,la=LORD[T.A.lagna],lb=tjHL(T.A,+cfg.ykH);
+  const pts=TJ7.map((n,i)=>{const a=(i/7)*2*Math.PI-Math.PI/2;return [n,110+85*Math.cos(a),110+85*Math.sin(a)]}),pp=n=>pts.find(p=>p[0]===n);
+  const svg=`<svg viewBox="0 0 220 220" style="max-width:260px;width:100%"><circle cx="110" cy="110" r="85" fill="none" stroke="var(--line)"/>${y.ith.map(x=>{const a=pp(x.p.a),b=pp(x.p.b);return a&&b?`<line x1="${a[1]}" y1="${a[2]}" x2="${b[1]}" y2="${b[2]}" stroke="${x.name==='Ithasala'?cfg.cah:cfg.csc}" stroke-width="${1+3*x.p.strength}" ${x.name==='Isarpha'?'stroke-dasharray="4 3"':''}/>`:''}).join('')}${pts.map(p=>`<g><circle cx="${p[1]}" cy="${p[2]}" r="14" fill="var(--card)" stroke="${[la,lb].includes(p[0])?'#c9a227':'var(--line)'}" stroke-width="2"/><text x="${p[1]}" y="${p[2]+4}" text-anchor="middle" font-size="11" fill="var(--ink)">${AB[p[0]]}</text></g>`).join('')}</svg>`;
+  return `<div class="card"><h3 style="margin-top:0">Tajik yogas</h3><div class="row" style="gap:8px 12px"><label style="margin:0">Matter (house) for the Lagna-lord pair<br><select onchange="tjSet('ykH',+this.value)">${opt([1,2,3,4,5,6,7,8,9,10,11,12].map(h=>[h,'House '+h+' – '+TJ_MH[h-1].split(',')[0]]),+cfg.ykH)}</select></label><label style="margin:0">Radda conditions<br>${tjSel('rdAll',[['y','Apply (retrograde, combust, debilitated, dusthana)'],['n','Report only']],300)}</label></div>
+   <p class="mute" style="margin:6px 0 0;font-size:12px">Implemented from the commonly taught formulation (class B/C, school-dependent, not verified against a primary text): Ithasala – the faster planet is behind the slower within the permitted orb; Isarpha – it has passed it; Kamboola – the Moon joins an Ithasala between the two planets; Nakta – a faster third planet applies to both planets that are not in aspect; Yamaya – both apply to a slower third planet; Radda – the Ithasala is spoiled by the listed conditions. Manau, Gairi-Kamboola, Khallasara and the Daghda-related conditions are RESEARCH PENDING because their formation rules could not be stated reliably.</p></div>
+   <div class="card"><div class="row" style="align-items:flex-start;gap:16px"><div>${svg}<p class="mute" style="font-size:11px;margin:4px 0 0">Green = Ithasala, red dashed = Isarpha; gold ring = Lagna lord and house lord.</p></div><div style="flex:1;min-width:280px"><h4 style="margin:0 0 4px">Pair: ${la} (Lagna lord) – ${lb} (lord of house ${cfg.ykH})</h4>${k?`<ul style="margin:0 0 0 18px;font-size:13px">${k.steps.map(s=>'<li>'+esc(s)+'</li>').join('')}</ul>`:'<p class="mute">The Lagna lord rules the selected house, so there is no pair.</p>'}</div></div></div>
+   <div class="card"><h3 style="margin-top:0">All pairs in aspect within the orb</h3><div style="overflow-x:auto"><table style="font-size:13px"><tr><th>Yoga</th><th>Planets</th><th>Why it is formed</th><th>Radda conditions</th></tr>${y.ith.map(x=>{const rd=tjRadda(T,x.p.a,x.p.b);return `<tr><td><b>${x.name}</b></td><td>${x.p.a} – ${x.p.b}</td><td class="mute" style="font-size:12px">${x.steps.map(esc).join('; ')}</td><td>${rd.length?esc(rd.join('; ')):'–'}</td></tr>`}).join('')||'<tr><td colspan="4" class="mute">No pair is within its orb.</td></tr>'}</table></div></div>`;
+}
+const tjDt=(ms,T)=>tjDay(ms,T.tz+T.dst);
+function tjTabDa(T){
+  const D=T.dasha,cfg=T.cfg,sel=V.tjDi,now=T.dashaNow;
+  const reg=[['mudda','Mudda','C'],['yogini','Yogini (scaled)','C'],['pat','Patyayini','E – pending']];
+  return `<div class="card"><h3 style="margin-top:0">Varshaphal Dasha systems</h3><div class="row" style="gap:8px 12px"><label style="margin:0">System<br>${tjSel('ds',[['mudda','Mudda Dasha'],['yogini','Yogini (scaled to one year)'],['pat','Patyayini – RESEARCH PENDING']])}</label><label style="margin:0">Year length<br>${tjSel('yl',[['actual','Actual length of this Varsha year'],['360','360 days'],['365','365 days'],['365.25','365.25 days'],['365.2422','365.2422 days']],250)}</label><label style="margin:0">Starting point<br>${tjSel('dstart',[['moon','Annual-chart Moon nakshatra (with balance)'],['planet','Chosen planet, no balance']],280)}</label>${cfg.dstart==='planet'?`<label style="margin:0">Planet<br><select onchange="tjSet('dsp',this.value)">${opt(DORD.map(p=>[p,p]),cfg.dsp)}</select></label>`:''}</div>
+   <p class="mute" style="margin:6px 0 0;font-size:12px"><b>${D.name}</b> – class ${D.cls}. ${esc(D.note)} Month, day and date-precision conventions beyond the year length are not configurable yet. Dashas are kept in separate engines and must not be called classical Tajik without a verified source.</p></div>
+   ${D.pending?'':`<div class="card"><div style="overflow-x:auto"><table style="font-size:13px"><tr><th>Dasha</th><th>Antardasha</th><th>Start</th><th>End</th><th>Duration (days)</th></tr>${D.list.map((m,i)=>`<tr style="cursor:pointer;background:var(--acc2);font-weight:700;${now&&now.md===m?'outline:2px solid #c9a227;':''}" onclick="V.tjDi=[${i},-1];render()"><td>${m.lord}${m.yogini?' ('+m.yogini+')':''}</td><td></td><td translate="no">${tjDt(m.start,T)}</td><td translate="no">${tjDt(m.end,T)}</td><td translate="no">${tjFix((m.end-m.start)/864e5,2)}</td></tr>`+m.ads.map((a,j)=>`<tr style="cursor:pointer;${now&&now.ad===a?'background:var(--acc2)':''}" onclick="V.tjDi=[${i},${j}];render()"><td></td><td>${a.lord}</td><td translate="no">${tjDt(a.start,T)}</td><td translate="no">${tjDt(a.end,T)}</td><td translate="no">${tjFix((a.end-a.start)/864e5,2)}</td></tr>`).join('')).join('')}</table></div><p class="mute" style="margin:6px 0 0;font-size:12px">Dates are calendar dates in the annual-chart time zone. The first period may begin before the return because the Moon is part-way through its nakshatra (the balance). Click a row to open its analysis.</p></div>
+   ${sel&&D.list[sel[0]]?tjDashaAn(T,D,sel):''}`}`;
+}
+function tjDashaAn(T,D,sel){
+  const m=D.list[sel[0]],a=sel[1]>=0?m.ads[sel[1]]:null,A=T.A,N=T.N,pl=(a||m).lord,vs=T.vsel.final,ml=T.muntha.lord;
+  const sh=TJ_SH.map(s=>tjSaham(T,s.id)).filter(r=>r&&r.lon!=null&&r.disp===pl).map(r=>r.name);
+  const yo=T.yg.ith.filter(x=>x.p.a===pl||x.p.b===pl).map(x=>x.name+' with '+(x.p.a===pl?x.p.b:x.p.a));
+  const rel=(x,y)=>x===y?'the same planet':NATF[x]&&NATF[x].includes(y)?'a natural friend':(NATE[x]||[]).includes(y)?'a natural enemy':'neutral / not defined';
+  return `<div class="card"><h3 style="margin-top:0">${m.lord}${a?' – '+a.lord:''} <span class="mute" style="font-weight:400;font-size:13px">${tjDt((a||m).start,T)} → ${tjDt((a||m).end,T)}</span></h3><table style="font-size:13px"><tr><td class="mute" style="width:240px">1 · Natal promise</td><td>${pl} natally in house ${tjHouse(N,N.P[pl].sign)} (${SIGNS[N.P[pl].sign]}), ${tjDigOf(N,pl)}, ruling natal houses ${tjLords(N,pl).join(', ')||'none'}</td></tr><tr><td class="mute">2 · Annual house placement</td><td>house ${tjHouse(A,A.P[pl].sign)} (${SIGNS[A.P[pl].sign]})</td></tr><tr><td class="mute">3 · Annual house lordship</td><td>${tjLords(A,pl).join(', ')||'none'}</td></tr><tr><td class="mute">4 · Dignity</td><td>${tjDigOf(A,pl)}${tjComb(A,pl)?', combust':''}${A.P[pl].retro&&pl!=='Rahu'&&pl!=='Ketu'?', retrograde':''}</td></tr><tr><td class="mute">5 · Varshesha ${vs}</td><td>${pl} is ${rel(pl,vs)} to the Varshesha</td></tr><tr><td class="mute">6 · Muntha (${SIGNS[T.muntha.idx]}, lord ${ml})</td><td>${pl} is ${rel(pl,ml)} to the Muntha lord; ${A.P[pl].sign===T.muntha.idx?'it occupies the Muntha sign':'it does not occupy the Muntha sign'}</td></tr><tr><td class="mute">7 · Saham links</td><td>${sh.length?'dispositor of '+sh.join(', '):'none among the loaded Sahams'}</td></tr><tr><td class="mute">8 · Tajik yogas</td><td>${yo.join('; ')||'none'}</td></tr><tr><td class="mute">9 · Transit support</td><td class="mute">RESEARCH PENDING – transit rules are not loaded</td></tr><tr><td class="mute">10 · Applying / separating aspects</td><td>${T.asp.filter(p=>!p.none&&p.within&&(p.a===pl||p.b===pl)).map(p=>(p.a===pl?p.b:p.a)+' '+p.type+' '+(p.applying?'applying':'separating')).join('; ')||'none within orb'}</td></tr></table><p class="mute" style="margin:6px 0 0;font-size:12px">${TJ_NOTE}</p></div>`;
+}
+function tjMonths(T){
+  const D=T.dasha,out=[],Y=T.nextMs-T.adjMs,tr=k=>{const ms=T.adjMs+k*Y/12,c=Object.assign(tjChartObj(T.c,T.cfg,ms),{id:'tj-m'+k,date:new Date(ms).toISOString().slice(0,10),time:new Date(ms).toISOString().slice(11,16),tz:0,dst:0,lat:T.lat,lon:T.lon});return getC(c)};
+  for(let k=0;k<12;k++){const s=T.adjMs+k*Y/12,e=T.adjMs+(k+1)*Y/12,C=tr(k),da=D.pending?null:tjDashaAt(D,s);
+    const asp=T.asp.filter(p=>!p.none&&p.within&&p.perf!=null&&T.adjMs+p.perf*864e5>=s&&T.adjMs+p.perf*864e5<e);
+    const ch=D.pending?[]:D.list.flatMap(m=>m.ads.map(a=>({m,a}))).filter(x=>x.a.start>=s&&x.a.start<e);
+    out.push({k,s,e,C,da,asp,ch});}
+  return out;
+}
+function tjTabTm(T){
+  const M=tjMonths(T),sel=V.tjMo!=null?V.tjMo:0,m=M[sel];
+  return `<div class="card"><h3 style="margin-top:0">Annual timing – twelve months of the Varsha year</h3><p class="mute" style="margin:0 0 6px;font-size:12px">The year is divided into twelve equal parts (${tjFix(T.yearDays/12,2)} days each; a Sun-ingress division is not loaded). Dates of Dasha changes are calculated; aspect-perfection dates are linear estimates from the annual chart; month boundaries are conventions, not interpretive timing.</p>
+   <div style="overflow-x:auto"><table style="font-size:13px"><tr><th>Month</th><th>From</th><th>Active Dasha / Antardasha at the start</th><th>Jupiter · Saturn · Rahu (house from annual Lagna)</th><th>Aspects perfecting</th></tr>${M.map(x=>`<tr style="cursor:pointer;${x.k===sel?'background:var(--acc2)':''}" onclick="V.tjMo=${x.k};render()"><td>${x.k+1}</td><td translate="no">${tjDt(x.s,T)}</td><td>${x.da?x.da.md.lord+' / '+x.da.ad.lord:'–'}</td><td translate="no">${['Jupiter','Saturn','Rahu'].map(n=>SIGNS[x.C.P[n].sign].slice(0,3)+' ('+tjHouse(T.A,x.C.P[n].sign)+')').join(' · ')}</td><td>${x.asp.length}</td></tr>`).join('')}</table></div></div>
+   <div class="card"><h3 style="margin-top:0">Month ${sel+1}: ${tjDt(m.s,T)} → ${tjDt(m.e,T)}</h3><table style="font-size:13px"><tr><td class="mute" style="width:230px">Dasha / Antardasha at the start</td><td>${m.da?m.da.md.lord+' / '+m.da.ad.lord:'–'}</td></tr><tr><td class="mute">Antardasha changes in the month</td><td>${m.ch.map(x=>tjDt(x.a.start,T)+' → '+x.m.lord+' / '+x.a.lord).join('; ')||'none'}</td></tr><tr><td class="mute">Aspects becoming exact (estimate)</td><td>${m.asp.map(p=>p.a+' '+p.type+' '+p.b+' ('+tjDt(T.adjMs+p.perf*864e5,T)+')').join('; ')||'none'}</td></tr><tr><td class="mute">Transit signs (annual-chart houses)</td><td translate="no">${PLANETS.map(n=>AB[n]+' '+SIGNS[m.C.P[n].sign].slice(0,3)+' ('+tjHouse(T.A,m.C.P[n].sign)+')').join(' · ')}</td></tr><tr><td class="mute">Muntha</td><td>${SIGNS[T.muntha.idx]} – house ${T.muntha.house}; transit planets in the Muntha sign: ${PLANETS.filter(n=>m.C.P[n].sign===T.muntha.idx).join(', ')||'none'}</td></tr><tr><td class="mute">Important annual houses</td><td>${[1,10,T.muntha.house].filter((x,i,a)=>a.indexOf(x)===i).join(', ')} (Lagna, 10th, Muntha house)</td></tr></table><p class="mute" style="margin:6px 0 0;font-size:12px">Calculated dates are separate from any interpretive timing estimate; none is given here.</p></div>`;
+}
+function tjTabPm(T){
+  const w=T.cfg.w,sel=V.tjCat!=null?V.tjCat:0,R=TJ_CATS.map(c=>tjPredict(T,c)),cur=R[sel];
+  const pct=x=>x==null?'–':Math.round(x*100)+'%';
+  return `<div class="card"><h3 style="margin-top:0">Annual prediction matrix</h3><p class="mute" style="margin:0 0 6px;font-size:12px">Eight layers are scored from 0 to 100% by transparent rules and combined with the weights below (initial software defaults, not classical weights; a layer that cannot be evaluated is left out and the weights are renormalised). A score is an indicator of how supportive the chart factors are – never a guaranteed event.</p>
+   <div class="row" style="gap:8px 10px">${TJ_LAYERS.map((l,i)=>`<label style="margin:0">${l}<br><input type="number" value="${w[i]}" style="width:60px" onchange="tjSetW(${i},this.value)"> %</label>`).join('')}<span class="mute">sum ${w.reduce((a,b)=>a+b,0)}</span></div></div>
+   <div class="card"><div style="overflow-x:auto"><table style="font-size:13px"><tr><th>Category</th><th>Houses · karaka</th>${TJ_LAYERS.map(l=>`<th style="font-size:11px">${l}</th>`).join('')}<th>Weighted</th><th>Confidence</th></tr>${R.map((r,i)=>`<tr style="cursor:pointer;${i===sel?'background:var(--acc2)':''}" onclick="V.tjCat=${i};render()"><td><b>${r.name}</b></td><td class="mute">${r.houses.join(',')} · ${r.kar}</td>${r.res.map(x=>`<td translate="no">${pct(x.s)}</td>`).join('')}<td translate="no"><b>${pct(r.score)}</b></td><td>${r.conf}${r.contra?' (mixed)':''}</td></tr>`).join('')}</table></div></div>
+   <div class="card"><h3 style="margin-top:0">${cur.name}</h3><table style="font-size:13px">${cur.res.map((x,i)=>`<tr><td class="mute" style="width:200px">Layer ${i+1} · ${TJ_LAYERS[i]}</td><td translate="no" style="width:60px">${pct(x.s)}</td><td>${esc(x.t)}</td></tr>`).join('')}</table>
+   <p style="margin:8px 0 0;font-size:13px"><b>Positive indicators:</b> ${cur.pos.map(esc).join('; ')||'none'}<br><b>Negative indicators:</b> ${cur.neg.map(esc).join('; ')||'none'}<br><b>Contradictory factors:</b> ${cur.contra?'yes – some layers are supportive and others challenging':'none found'}<br><b>Confidence:</b> ${cur.conf} (${cur.evaluated} of 8 layers evaluated)<br><b>Timing window:</b> ${tjWin(T,cur)}</p><p class="mute" style="margin:6px 0 0;font-size:12px">The houses and karakas used for each category are common significations (editable in a later version). ${TJ_NOTE}</p></div>`;
+}
+function tjWin(T,cur){
+  const D=T.dasha;if(D.pending)return 'not available (no Dasha loaded)';const hs=cur.houses,A=T.A,lords=new Set(hs.map(h=>tjHL(A,h)).concat([cur.kar])),occ=new Set(PLANETS.filter(n=>hs.includes(tjHouse(A,A.P[n].sign))));
+  const w=D.list.flatMap(m=>m.ads.map(a=>({m,a}))).filter(x=>(lords.has(x.a.lord)||occ.has(x.a.lord))&&(lords.has(x.m.lord)||occ.has(x.m.lord)));
+  return w.length?w.slice(0,4).map(x=>tjDt(x.a.start,T)+' → '+tjDt(x.a.end,T)+' ('+x.m.lord+'/'+x.a.lord+')').join('; ')+' – calculated Dasha windows linked to the relevant houses':'no Dasha window links both the lord and the antardasha lord to the relevant houses';
+}
+function tjSnap(year){const s=tjCfg(),save0=V.tjC,y0=s.year;let o=null;try{s.year=year;V.tjC=null;const T=tjFull();o={year,ret:tjFmt(T.adjMs,T.tz+T.dst),lagna:SIGNS[T.A.lagna],muntha:SIGNS[T.muntha.idx]+' (house '+T.muntha.house+')',vs:T.vsel.final,first:T.dasha.list[0]?T.dasha.list[0].lord:'–',mun:T.mun.label,py:T.A.P}}finally{s.year=y0;V.tjC=save0}return o}
+function tjTabCm(T){
+  const rows=[];for(let k=-1;k<=4;k++)rows.push(tjSnap(T.year+k));
+  const ov=PLANETS.map(n=>({n,ah:tjHouse(T.N,T.A.P[n].sign),nh:tjHouse(T.A,T.N.P[n].sign)}));
+  const o={muntha:true};
+  return `<div class="card"><div class="row"><b>Natal and Varshaphal</b><span style="margin-left:auto">Style: <button class="sm ${V.style==='south'?'on':''}" onclick="V.style='south';render()">South</button> <button class="sm ${V.style==='north'?'on':''}" onclick="V.style='north';render()">North</button></span></div><div class="row" style="align-items:flex-start;gap:16px;margin-top:8px"><div style="flex:1;min-width:280px;max-width:420px">${tjChartSvg(T,T.N,'Natal D1',{})}</div><div style="flex:1;min-width:280px;max-width:420px">${tjChartSvg(T,T.A,'Varshaphal D1',o)}</div></div></div>
+   <div class="card"><h3 style="margin-top:0">Overlay</h3><table style="font-size:13px"><tr><th>Planet</th><th>Annual planet in the natal house</th><th>Natal planet in the annual house</th></tr>${ov.map(x=>`<tr><td>${x.n}</td><td>${x.ah}</td><td>${x.nh}</td></tr>`).join('')}</table><table style="font-size:13px;margin-top:8px"><tr><td class="mute" style="width:300px">Annual Lagna (${SIGNS[T.A.lagna]}) in the natal chart</td><td>natal house ${tjHouse(T.N,T.A.lagna)}</td></tr><tr><td class="mute">Muntha (${SIGNS[T.muntha.idx]}) in the natal chart</td><td>natal house ${tjHouse(T.N,T.muntha.idx)}</td></tr><tr><td class="mute">Varshesha ${T.vsel.final} against the natal planets</td><td>natal ${T.vsel.final} is in ${SIGNS[T.N.P[T.vsel.final].sign]} (house ${tjHouse(T.N,T.N.P[T.vsel.final].sign)}); annual ${T.vsel.final} is in natal house ${tjHouse(T.N,T.A.P[T.vsel.final].sign)}</td></tr></table></div>
+   <div class="card"><h3 style="margin-top:0">Annual charts across years</h3><div style="overflow-x:auto"><table style="font-size:13px"><tr><th>Year</th><th>Return</th><th>Varsha Lagna</th><th>Muntha</th><th>Varshesha</th><th>First Dasha lord</th><th>Muntha reading</th></tr>${rows.map(r=>`<tr style="${r.year===T.year?'background:var(--acc2);font-weight:700':''}"><td>${r.year}</td><td translate="no">${r.ret}</td><td>${r.lagna}</td><td>${r.muntha}</td><td>${r.vs}</td><td>${r.first}</td><td>${r.mun}</td></tr>`).join('')}</table></div></div>`;
+}
+/* ---- rulebook, tests ---- */
+const TJ_REG=[
+ ['TJ-SR-001','Solar return','Annual chart for the instant the Sun returns to its natal longitude in the selected zodiac','Newton iteration on the Sun longitude (shared ephemeris), rounded to the minute for the chart','B','Implemented – verified by test (Sun difference < 0.001°)'],
+ ['TJ-AS-001','Aspects (sign-based)','Aspect by sign position 1, 3/11, 4/10, 5/9, 7; orb measured in degrees within the sign','Mutual orb = ½ (deeptamsa A + deeptamsa B)','B','Implemented – orb table unverified'],
+ ['TJ-AS-002','Deeptamsa orbs','Sun 15, Moon 12, Mars 8, Mercury 7, Jupiter 9, Venus 7, Saturn 9','Commonly cited','B','Unverified against a primary text'],
+ ['TJ-AS-003','Aspects (exact longitude)','Nearest of 0/60/90/120/180° measured on longitude','Same mutual orb','C','Implemented'],
+ ['TJ-AS-004','Degree-based aspect','Definition not fixed','—','E','RESEARCH PENDING (treated as sign-based)'],
+ ['TJ-AS-005','Applying / separating','delta × relative rate < 0 = applying; classical rank or actual speed','Linear perfection estimate = |delta / relative speed|','C','Implemented'],
+ ['TJ-AS-006','Aspect nature','60°, 120° harmonious; 90°, 180° challenging; conjunction by planetary nature (configurable)','Common textbook classification','B','Unverified'],
+ ['TJ-MU-001','Muntha','Muntha sign = (natal Lagna index + completed years) mod 12','Completed years = Varsha year − birth year (+ offset)','A/B','Implemented – formula standard; convention selectable'],
+ ['TJ-MU-002','Muntha modifiers','Lord dignity, combustion, retrogression, dusthana, aspects, friendship with Varshesha; editable weights','Weights are software defaults','C','Implemented – weights are not classical'],
+ ['TJ-AR-001','Argala','Argala houses 2, 4, 11, 5; Virodhargala 12, 10, 3, 9 counted from a reference sign','Obstruction by planet count; tie rule selectable','B','Jaimini-derived; special 3rd/9th rules RESEARCH PENDING'],
+ ['TJ-SA-001','Saham engine','(A + B − C) mod 360°, day/night variants, user formulas','Point tokens as listed in the Sahams tab','—','Implemented'],
+ ['TJ-SA-002','Supplied Saham list (35)','35 formulas with day and night variants; six are the same by day and night (Bhratri, Artha, Labha, Vanik, Paradesa, Mrityu)','Supplied by the Product Owner from an AI web summary citing astroshruti.ai, vedastro.org and a Scribd list','B','Loaded – 33 of the 35 day formulas match Jagannatha Hora on one day chart (Roga differs; Manmatha not visible); NOT verified against a primary text; night births unchecked'],
+ ['TJ-SA-006','Rules fixed by the Jagannatha Hora comparison','The 30° test uses the Lagna (not point C); house points H2, H8, H9, H11 are equal-house cusps from the Lagna degree','Compared Saham by Saham on one chart (14 Nov 2026, 12:56, South Grafton)','C','Implemented – verified on one day chart only'],
+ ['TJ-SA-003','Saham not in the supplied list','Stri, Kshema, Bhaya, Ayush, Bhagya, Vyapara','—','E','RESEARCH PENDING – user can define (class D)'],
+ ['TJ-SA-004','30° correction','After A − B + C, add 30° if the Lagna is not in the arc from B forward to A (the supplied text says point C; Jagannatha Hora behaves as the Lagna test)','Supplied (vedastro.org summary); selectable','B','Implemented – selectable; matches Jagannatha Hora on one day chart'],
+ ['TJ-SA-005','Roga variants','Roga is stated to vary between texts (Saturn − Moon + Lagna; Lagna − Moon + Lagna, reversing or not)','Supplied note','E','Main formula loaded; the two variant entries are assumptions – RESEARCH PENDING'],
+ ['TJ-PA-001','Panchadhikari','Muntha lord, Janma Lagna lord, Varsha Lagna lord, tri-rashi lord, dina-ratri lord','Dina-ratri definition selectable','B','Unverified; lists differ between texts'],
+ ['TJ-PA-002','Varshesha','Eligible = aspects the Varsha Lagna; chosen = strongest by dignity score','Panchavargiya bala not used','C','Panchavargiya bala RESEARCH PENDING'],
+ ['TJ-YG-001','Ithasala / Isarpha','Faster planet behind / ahead of the slower within the orb','Uses the aspect engine','B','Implemented'],
+ ['TJ-YG-002','Kamboola','Ithasala between the pair and the Moon joins','Moon with either planet','B','Implemented – school-dependent'],
+ ['TJ-YG-003','Nakta / Yamaya','Third planet faster (Nakta) or slower (Yamaya) than both','Classical speed order','C','Implemented – formulation unverified'],
+ ['TJ-YG-004','Radda','Ithasala spoiled by retrogression, combustion, debilitation or dusthana','Applied or reported (setting)','B','Implemented – unverified'],
+ ['TJ-YG-005','Manau, Gairi-Kamboola, Khallasara, Daghda-related','Formation rules not stated reliably','—','E','RESEARCH PENDING'],
+ ['TJ-DA-001','Mudda Dasha','Vimshottari periods scaled so 120 years = one Varsha year; start by annual Moon nakshatra with balance','Year length selectable','C','Research interpretation – source not verified'],
+ ['TJ-DA-002','Yogini (scaled)','36-year Yogini cycle scaled to one Varsha year; start (nakshatra number + 3) mod 8','Year length selectable','C','Research interpretation'],
+ ['TJ-DA-003','Patyayini','No validated formula loaded','—','E','RESEARCH PENDING'],
+ ['TJ-PM-001','Prediction matrix','Eight layers with editable weights (20/20/10/15/10/10/10/5)','Layer scores 0–1 by transparent rules','D','Software defaults, not classical weights'],
+ ['TJ-PM-002','Category houses and karakas','Common signification mapping per category','—','B','Editable in a later version'],
+ ['TJ-TM-001','Monthly timing','Twelve equal parts of the Varsha year','Sun-ingress months not loaded','C','Implemented'],
+ ['TJ-OT-001','Month lord, day lord, year lord by day','Not loaded','—','E','RESEARCH PENDING']
+];
+function tjTests(){
+  const R=[],t=(n,exp,got,ok)=>R.push({n,exp,got,ok:ok===undefined?String(exp)===String(got):ok});
+  const ch={id:'t',name:'Test',date:'1990-08-15',time:'10:30',tz:5.5,dst:0,lat:23.02,lon:72.57,ay:'lahiri',node:'mean',hs:'whole',vm:'para'},cfg=Object.assign(JSON.parse(JSON.stringify(TJ_DEF)),{year:2026});
+  const T=tjFull(ch,cfg);
+  const dl=Math.abs(norm(T.A.P.Sun.lon-T.N.P.Sun.lon+180)-180);t('Solar return: annual Sun equals natal Sun (2026)','< 0.001°',tjFix(dl,6)+'°',dl<0.001);
+  [1991,2000,2025,2030].forEach(y=>{const c2=Object.assign({},cfg,{year:y}),T2=tjFull(Object.assign({},ch,{id:'t'+y}),c2),d2=Math.abs(norm(T2.A.P.Sun.lon-T2.N.P.Sun.lon+180)-180);t('Solar return: Sun difference '+y,'< 0.001°',tjFix(d2,6)+'°',d2<0.001)});
+  const lp={id:'lp',name:'Leap',date:'2000-02-29',time:'23:50',tz:5.5,dst:0,lat:28.6,lon:77.2,ay:'lahiri',node:'mean',hs:'whole',vm:'para'},T3=tjFull(lp,Object.assign({},cfg,{year:2025})),d3=Math.abs(norm(T3.A.P.Sun.lon-T3.N.P.Sun.lon+180)-180);t('Leap-day birth near midnight: return found and Sun difference small','< 0.001°',tjFix(d3,6)+'°',d3<0.001);
+  const west={id:'w',name:'West',date:'1985-03-10',time:'22:15',tz:-5,dst:1,lat:40.7,lon:-74,ay:'lahiri',node:'mean',hs:'whole',vm:'para'},T4=tjFull(west,Object.assign({},cfg,{year:2026})),d4=Math.abs(norm(T4.A.P.Sun.lon-T4.N.P.Sun.lon+180)-180);t('Different time zone with daylight saving: Sun difference small','< 0.001°',tjFix(d4,6)+'°',d4<0.001);
+  const tr=tjFull(Object.assign({},ch,{id:'tt'}),Object.assign({},cfg,{zod:'trop',year:2026})),d5=Math.abs(norm(tr.A.P.Sun.lon-tr.N.P.Sun.lon+180)-180);t('Tropical zodiac: return found','< 0.001°',tjFix(d5,6)+'°',d5<0.001);
+  t('Muntha index = (natal Lagna + completed years) mod 12',((T.N.lagna+(2026-1990))%12),T.muntha.idx);
+  const T6=tjFull(Object.assign({},ch,{id:'m12'}),Object.assign({},cfg,{year:2002}));t('Muntha after 12 completed years returns to the natal Lagna sign',T6.N.lagna,T6.muntha.idx);
+  const mk=(n,lon,spd,retro)=>({n,lon,sign:Math.floor(lon/30),deg:lon%30,retro:!!retro,spd}),c2=Object.assign({},JSON.parse(JSON.stringify(TJ_DEF)));
+  let p=tjPair(mk('Moon',10,13),mk('Saturn',75,0.1),c2);t('Moon Aries 10°, Saturn Gemini 15°: sextile, within orb, applying','Sextile,true,true',p.type+','+p.within+','+p.applying);
+  p=tjPair(mk('Moon',25,13),mk('Saturn',75,0.1),c2);t('Moon Aries 25°, Saturn Gemini 15°: Moon has passed – separating','Sextile,true,false',p.type+','+p.within+','+p.applying);
+  p=tjPair(mk('Sun',0,1),mk('Mars',92,0.5),c2);t('Sun Aries 0° and Mars Cancer 2°: square by sign, orb difference 2°, within the 11.5° mutual orb','Square,true',p.type+','+p.within);
+  p=tjPair(mk('Sun',0,1),mk('Mars',30,0.5),c2);t('Sun Aries 0°, Mars Taurus 0°: no aspect by sign (adjacent signs)','true',!!p.none);
+  p=tjPair(mk('Sun',29,1),mk('Mercury',31,1.2),Object.assign({},c2,{am:'exact'}));t('Exact method: 29° Aries and 1° Taurus are a conjunction across the sign boundary','Conjunction,true',p.type+','+p.within);
+  p=tjPair(mk('Sun',100,1),mk('Mars',190,-0.3),Object.assign({},c2,{spd:'actual'}));t('Actual speeds, retrograde Mars exactly ahead 90°+0°: delta 0, perfection 0 days','Square',p.type);
+  p=tjPair(mk('Jupiter',100,0.2),mk('Venus',130,1.1),c2);t('Venus Leo 10° and Jupiter Cancer 10° (adjacent signs): no sign aspect','true',!!p.none);
+  const fake={A:{P:{Sun:{lon:100}},ascLon:300},cfg:{dn:'horizon'}},fake2={A:{P:{Sun:{lon:100}},ascLon:190},cfg:{dn:'horizon'}};t('Day / night: Sun 100°, Ascendant 300° is night; Ascendant 190° is day','false,true',tjIsDay(fake)+','+tjIsDay(fake2));
+  const ev=tjEval(T,'Moon-Sun+Lagna'),man=norm(T.A.P.Moon.lon-T.A.P.Sun.lon+T.A.ascLon);t('Saham formula (A + B − C) mod 360 evaluated','equal',tjFix(ev.lon,6)+' vs '+tjFix(man,6),Math.abs(ev.lon-man)<1e-9);
+  t('Saham references to itself are refused','circular reference',(()=>{const T7=Object.assign({},T,{cfg:Object.assign({},T.cfg,{shUser:{punya:{d:'Saham:Punya+Lagna',n:'Saham:Punya+Lagna'}}})});const r=tjSaham(T7,'punya');return r.err||r.src})(),true);
+  t('Mudda Dasha lengths add up to the chosen year length','equal',tjFix(T.dasha.list.reduce((a,m)=>a+(m.end-m.start),0)/864e5,3)+' vs '+tjFix(T.yearDays,3),Math.abs(T.dasha.list.reduce((a,m)=>a+(m.end-m.start),0)/864e5-T.yearDays)<1e-6);
+  const T8=tjFull(Object.assign({},ch,{id:'y360'}),Object.assign({},cfg,{yl:'360'}));t('Mudda with a 360-day year: total 360 days','360.000',tjFix(T8.dasha.list.reduce((a,m)=>a+(m.end-m.start),0)/864e5,3));
+  const T9=tjFull(Object.assign({},ch,{id:'yg'}),Object.assign({},cfg,{ds:'yogini'}));t('Yogini scaled: total equals the year length','equal',tjFix(T9.dasha.list.reduce((a,m)=>a+(m.end-m.start),0)/864e5,3)+' vs '+tjFix(T9.yearDays,3),Math.abs(T9.dasha.list.reduce((a,m)=>a+(m.end-m.start),0)/864e5-T9.yearDays)<1e-6);
+  const fa={A:{P:{Sun:{sign:0},Moon:{sign:1},Mars:{sign:1},Mercury:{sign:3},Jupiter:{sign:7},Venus:{sign:5},Saturn:{sign:9},Rahu:{sign:2},Ketu:{sign:8}}},cfg:{art:'ge'}},ag=tjArgala(fa,0);t('Argala from Aries: 2nd house has Moon and Mars (2), 12th house empty → effective','effective',ag[0].status);
+  const fb=Object.assign({},fa,{cfg:{art:'gt'}});t('Argala tie rule: 4th house has Mercury, 10th has Saturn – equal counts','obstructed,effective',tjArgala(fa,0)[1].status+','+tjArgala(fb,0)[1].status);
+  t('Every Panchadhikari list names a lord for each role','5',tjCands(T).length);
+  t('Day 1–366: the annual calendar has every tab computed without error','true',(()=>{try{tjHouseTable(T);tjTabAs(T);tjTabMu(T);tjTabSa(T);tjTabPa(T);tjTabYo(T);tjTabDa(T);return true}catch(e){return e.message}})());
+  if(typeof tjTests2==='function')tjTests2(R,t,T);
+  return R;
+}
+function tjTabAu(T){
+  const tests=tjTests(),ok=tests.filter(x=>x.ok).length,saved=(S.ui&&S.ui.tjSaved)||[];
+  return `<div class="card"><h3 style="margin-top:0">Research and calculation audit</h3><p class="mute" style="margin:0 0 6px;font-size:12px">${TJ_RULES_NOTE}</p><h4 style="margin:6px 0 4px">Solar return audit</h4>${tjReturnTable(T)}<h4 style="margin:10px 0 4px">Saved profile of this chart</h4><pre style="font-size:11px;white-space:pre-wrap;margin:0">${esc(JSON.stringify(T.cfg))}</pre></div>
+   <div class="card"><h3 style="margin-top:0">Rule registry (${TJ_REG.length})</h3><div style="overflow-x:auto"><table style="font-size:12px"><tr><th>Rule ID</th><th>Rule</th><th>Definition</th><th>Formula / note</th><th>Class</th><th>Status</th></tr>${TJ_REG.map(r=>`<tr><td>${r[0]}</td><td>${r[1]}</td><td>${esc(r[2])}</td><td>${esc(r[3])}</td><td>${r[4]}</td><td>${esc(r[5])}</td></tr>`).join('')}</table></div><p class="mute" style="margin:6px 0 0;font-size:12px">No source text, chapter or verse is cited for any rule because none was consulted. Approval status of every rule: PENDING – Product Owner approval required.</p></div>
+   <div class="card"><h3 style="margin-top:0">Calculation preference matrix</h3><table style="font-size:13px"><tr><th>Preference</th><th>Options</th><th>Default</th></tr><tr><td>Zodiac</td><td>sidereal / tropical</td><td>sidereal</td></tr><tr><td>Ayanamsha, node, house system</td><td>same as the chart or any listed</td><td>same as the chart</td></tr><tr><td>Aspect method</td><td>sign-based / exact / user orbs / degree-based (pending)</td><td>sign-based</td></tr><tr><td>Faster planet</td><td>classical order / actual speed</td><td>classical</td></tr><tr><td>Day / night</td><td>Sun above horizon / sunrise–sunset</td><td>Sun above horizon</td></tr><tr><td>Muntha</td><td>offset, degree rule</td><td>completed years, Lagna degree</td></tr><tr><td>Argala tie rule</td><td>≥ / &gt;</td><td>≥</td></tr><tr><td>Saham formulas</td><td>library or user-defined</td><td>library</td></tr><tr><td>Candidate list / Dina-ratri / aspect required</td><td>see Panchadhikari tab</td><td>traditional five</td></tr><tr><td>Dasha system / year length / start</td><td>Mudda, Yogini (scaled), Patyayini (pending)</td><td>Mudda, actual year, Moon nakshatra</td></tr><tr><td>Prediction weights</td><td>editable</td><td>20/20/10/15/10/10/10/5</td></tr></table></div>
+   <div class="card"><h3 style="margin-top:0">Validation <span class="mute" style="font-weight:400;font-size:13px">(${ok} of ${tests.length} checks pass)</span></h3><div style="overflow-x:auto"><table style="font-size:12px"><tr><th>Check</th><th>Expected</th><th>Result</th><th></th></tr>${tests.map(x=>`<tr><td>${esc(x.n)}</td><td translate="no">${esc(String(x.exp))}</td><td translate="no">${esc(String(x.got))}</td><td>${x.ok?'<span class="ok">✓</span>':'<span class="bad">✗</span>'}</td></tr>`).join('')}</table></div><p class="mute" style="margin:6px 0 0;font-size:12px">The expected values are worked out by hand or follow from the definitions above. This module has NOT been compared with Jagannatha Hora or any other software, and no such validation is claimed.</p></div>
+   <div class="card"><h3 style="margin-top:0">Saved analyses</h3>${saved.length?`<table style="font-size:13px"><tr><th>Saved</th><th>Chart</th><th>Year</th><th>Return</th><th>Lagna</th><th>Muntha</th><th>Varshesha</th></tr>${saved.map(s=>`<tr><td translate="no">${s.when.slice(0,16).replace('T',' ')}</td><td>${esc(s.chart)}</td><td>${s.year}</td><td translate="no">${s.ret}</td><td>${s.lagna}</td><td>${s.muntha}</td><td>${s.varshesha}</td></tr>`).join('')}</table>`:'<p class="mute">Nothing saved yet. Use “Save this analysis” in the master configuration; the calculation profile is stored with it.</p>'}</div>`;
+}
+function vTajik(){
+  const c=curChart();if(!c)return NOCHART;
+  let T;try{T=tjFull()}catch(e){return `<div class="card"><b>Tajik</b><p class="bad">The annual chart could not be calculated: ${esc(e.message)}</p></div>`}
+  const tab=V.tjt||'bp',vs=T.vsel;
+  const head=`<div class="card" style="border-top:4px solid #c9a227"><div class="row"><h2 style="margin:0">AppstroSutras – Tajik</h2><span class="mute">Annual horoscope and predictive engine</span>${chartSel(c)}</div>
+   <div class="row" style="gap:6px 18px;margin-top:6px;font-size:13px"><span><b>${esc(c.name)}</b></span><span class="mute" translate="no">${c.date} ${c.time} · UTC${c.tz>=0?'+':''}${c.tz}</span><span>Varsha <b translate="no">${T.year}</b></span><span>Return <b translate="no">${tjFmt(T.adjMs,T.tz+T.dst)}</b></span><span>Lagna <b>${SIGNS[T.A.lagna]}</b></span><span>Muntha <b>${SIGNS[T.muntha.idx]}</b> (${T.muntha.house})</span><span>Varshesha <b>${vs.final}</b>${vs.manual?' (manual)':''}</span></div></div>`;
+  const tabs=`<div class="card noprint" style="padding:8px 14px"><div class="row">${TJ_TABS.map(([k,l])=>`<button class="${tab===k?'on':''}" onclick="tjGo('${k}')">${l}</button>`).join('')}</div></div>`;
+  const body={bp:tjTabBp,as:tjTabAs,mu:tjTabMu,ar:tjTabAr,sa:tjTabSa,vp:tjTabVp,pa:tjTabPa,yo:tjTabYo,da:tjTabDa,tm:tjTabTm,pm:tjTabPm,cm:tjTabCm,au:tjTabAu}[tab](T);
+  const warn=`<div class="card" style="border-left:4px solid var(--warn);font-size:13px"><b>Rulebook status.</b> Tajik traditions differ between schools; every disputed rule is a preference. Rules that could not be stated reliably are marked RESEARCH PENDING and are not applied. No rule has been verified against a primary text, and this module has not been compared with other software. All wording is draft interpretive text, not prediction.</div>`;
+  return head+tabs+(tab==='bp'||tab==='au'?'':tjConfigPanel(T,false))+body+(tab==='au'?'':warn);
+}
+/* ============ TAJIK – supplied Saham list (35 formulas), 30° correction rule, tests (replaces the earlier Saham library) ============ */
+const TJ_SH_SRC='Supplied by the Product Owner (AI web summary citing astroshruti.ai, vedastro.org and the Scribd list "List of Sahamas"); not verified against a primary text';
+const TJ_SH=[
+ ['punya','Punya','Fortune and merit',['Moon-Sun+Lagna','Sun-Moon+Lagna'],[9,5],'Jupiter','Fortune, status, spiritual'],
+ ['vidya','Vidya','Education',['Sun-Moon+Lagna','Moon-Sun+Lagna'],[4,5],'Mercury','Fortune, status, spiritual'],
+ ['yasas','Yasas','Fame',['Jupiter-Saham:Punya+Lagna','Saham:Punya-Jupiter+Lagna'],[10,1],'Sun','Fortune, status, spiritual'],
+ ['mahatmya','Mahatmya','Greatness',['Saham:Punya-Mars+Lagna','Mars-Saham:Punya+Lagna'],[9,10],'Jupiter','Fortune, status, spiritual'],
+ ['asha','Asha','Desires',['Saturn-Mars+Lagna','Mars-Saturn+Lagna'],[11],'Venus','Fortune, status, spiritual'],
+ ['samartha','Samartha','Competence',['Mars-LordLagna+Lagna','LordLagna-Mars+Lagna'],[1,3],'Mars','Fortune, status, spiritual'],
+ ['gaurava','Gaurava','Respect',['Jupiter-Moon+Sun','Moon-Jupiter+Sun'],[10],'Sun','Fortune, status, spiritual'],
+ ['sastra','Sastra','Scriptures',['Jupiter-Saturn+Mercury','Saturn-Jupiter+Mercury'],[5,9],'Jupiter','Fortune, status, spiritual'],
+ ['sraddha','Sraddha','Devotion',['Venus-Mars+Lagna','Mars-Venus+Lagna'],[9,5],'Venus','Fortune, status, spiritual'],
+ ['preeti','Preeti','Love',['Saham:Sastra-Saham:Punya+Lagna','Saham:Punya-Saham:Sastra+Lagna'],[5,7],'Venus','Fortune, status, spiritual'],
+ ['pitri','Pitri','Father',['Saturn-Sun+Lagna','Sun-Saturn+Lagna'],[9],'Sun','Family and relationships'],
+ ['matri','Matri','Mother',['Moon-Venus+Lagna','Venus-Moon+Lagna'],[4],'Moon','Family and relationships'],
+ ['bhratri','Bhratri','Siblings (same by day and night)',['Jupiter-Saturn+Lagna','Jupiter-Saturn+Lagna'],[3],'Mars','Family and relationships'],
+ ['putra','Putra','Children',['Jupiter-Moon+Lagna','Moon-Jupiter+Lagna'],[5],'Jupiter','Family and relationships'],
+ ['vivaha','Vivaha','Marriage',['Venus-Saturn+Lagna','Saturn-Venus+Lagna'],[7],'Venus','Family and relationships'],
+ ['mitra','Mitra','Friends',['Jupiter-Saham:Punya+Venus','Saham:Punya-Jupiter+Venus'],[11],'Venus','Family and relationships'],
+ ['bandhu','Bandhu','Relatives',['Mercury-Moon+Lagna','Moon-Mercury+Lagna'],[4],'Mars','Family and relationships'],
+ ['paradara','Paradara','Extramarital relations',['Venus-Sun+Lagna','Sun-Venus+Lagna'],[7,12],'Venus','Family and relationships'],
+ ['manmatha','Manmatha','Passion',['Moon-LordLagna+Lagna','LordLagna-Moon+Lagna'],[5,7],'Venus','Family and relationships'],
+ ['karma','Karma','Profession',['Mars-Mercury+Lagna','Mercury-Mars+Lagna'],[10],'Saturn','Career, wealth and travel'],
+ ['rajya','Rajya','Authority',['Saturn-Sun+Lagna','Sun-Saturn+Lagna'],[10],'Sun','Career, wealth and travel'],
+ ['artha','Artha','Wealth (same by day and night)',['H2-LordH2+Lagna','H2-LordH2+Lagna'],[2,11],'Jupiter','Career, wealth and travel'],
+ ['labha','Labha','Gains (same by day and night)',['H11-LordH11+Lagna','H11-LordH11+Lagna'],[11],'Jupiter','Career, wealth and travel'],
+ ['vanik','Vanik','Trade (same by day and night)',['Moon-Mercury+Lagna','Moon-Mercury+Lagna'],[7,10],'Mercury','Career, wealth and travel'],
+ ['karyasiddhi','Karyasiddhi','Success',['Saturn-Sun+LordOf:Sun','Sun-Saturn+LordOf:Sun'],[10,11],'Saturn','Career, wealth and travel'],
+ ['paradesha','Paradesa','Foreign travel (same by day and night)',['H9-LordH9+Lagna','H9-LordH9+Lagna'],[9,12],'Rahu','Career, wealth and travel'],
+ ['jalapatana','Jalapatana','Sea voyages (15° Cancer = 105°)',['@105-Saturn+Lagna','Saturn-@105+Lagna'],[9,12],'Moon','Career, wealth and travel'],
+ ['jeeva','Jeeva','Vitality',['Saturn-Jupiter+Lagna','Jupiter-Saturn+Lagna'],[1],'Jupiter','Health, adversity and endings'],
+ ['roga','Roga','Disease',['Saturn-Moon+Lagna','Moon-Saturn+Lagna'],[6],'Mars','Health, adversity and endings'],
+ ['mrityu','Mrityu','Death (same by day and night)',['H8-Moon+Lagna','H8-Moon+Lagna'],[8],'Saturn','Health, adversity and endings'],
+ ['kali','Kali','Strife',['Jupiter-Mars+Lagna','Mars-Jupiter+Lagna'],[6],'Mars','Health, adversity and endings'],
+ ['shatru','Shatru','Enemies',['Mars-Saturn+Lagna','Saturn-Mars+Lagna'],[6],'Mars','Health, adversity and endings'],
+ ['bandhana','Bandhana','Imprisonment',['Saham:Punya-Saturn+Lagna','Saturn-Saham:Punya+Lagna'],[12,6],'Saturn','Health, adversity and endings'],
+ ['apamritu','Apamritu','Accidents',['H8-Mars+Lagna','Mars-H8+Lagna'],[8],'Mars','Health, adversity and endings'],
+ ['jadya','Jadya','Lethargy',['Mars-Saturn+Mercury','Saturn-Mars+Mercury'],[6,8],'Saturn','Health, adversity and endings'],
+ ['roga_v1','Roga – Jagannatha Hora form','Disease (day formula matches Jagannatha Hora; night reversal assumed)',['Lagna-Moon+Lagna','Moon-Lagna+Lagna'],[6],'Mars','Matched to Jagannatha Hora (one day chart)'],
+ ['roga_v2','Roga – Jagannatha Hora form, no night reversal','Disease (assumption for the night case)',['Lagna-Moon+Lagna','Lagna-Moon+Lagna'],[6],'Mars','Variants (disputed)'],
+ ['santapa','Santapa','Sorrow (formula inferred from the Jagannatha Hora value; night reversal assumed)',['Saturn-Moon+H6','Moon-Saturn+H6'],[6,8],'Saturn','Matched to Jagannatha Hora (one day chart)'],
+ ['vyapara','Vyapara','Trade and business (formula inferred from the Jagannatha Hora value; identical to Shatru in that chart)',['Mars-Saturn+Lagna','Saturn-Mars+Lagna'],[7,10],'Mercury','Matched to Jagannatha Hora (one day chart)'],
+ ['stri','Stri','Women and spouse',null,[7],'Venus','Not in the supplied list'],['kshema','Kshema','Welfare',null,[1],'Jupiter','Not in the supplied list'],['bhaya','Bhaya','Fear',null,[8,12],'Saturn','Not in the supplied list'],['ayush','Ayush','Longevity',null,[8],'Saturn','Not in the supplied list'],['bhagya','Bhagya','Fortune',null,[9],'Jupiter','Not in the supplied list']
+].map(r=>({id:r[0],name:r[1],purpose:r[2],def:r[3],houses:r[4],karaka:r[5],cat:r[6],cls:r[3]?(r[6].startsWith('Variants')?'E':r[6].startsWith('Matched')?'C':'B'):'E',src:r[3]?(r[6].startsWith('Variants')?'Assumption – RESEARCH PENDING':r[6].startsWith('Matched')?'Day formula matches the Jagannatha Hora value on one day chart (to about 1 arc-minute); the night form is an assumption':TJ_SH_SRC+'; day formula matches Jagannatha Hora on one day chart (checked)'):'Formula not supplied – RESEARCH PENDING'}));
+const TJ_CATS=[['Health',[1,6,8],'Sun','roga'],['Finance',[2,11],'Jupiter','artha'],['Profession',[10],'Saturn','karma'],['Business',[7,10,11],'Mercury','vanik'],['Marriage',[7],'Venus','vivaha'],['Relationships',[7,11],'Venus','mitra'],['Children',[5],'Jupiter','putra'],['Education',[4,5],'Mercury','vidya'],['Property',[4],'Mars','bandhu'],['Travel',[3,9,12],'Moon','paradesha'],['Foreign settlement',[12,9],'Rahu','paradesha'],['Litigation',[6,7],'Mars','shatru'],['Recognition',[10,1],'Sun','yasas'],['Spiritual development',[9,12,5],'Ketu','punya'],['Unexpected events',[8,12],'Rahu','mrityu']];
+function tjPoint(T,tok,seen){
+  const C=T.A;tok=tok.trim();
+  if(PLANETS.includes(tok))return C.P[tok].lon;if(tok==='Lagna')return C.ascLon;if(tok==='Muntha')return T.muntha.lon;
+  let m=/^@([\d.]+)$/.exec(tok);if(m)return +m[1];
+  m=/^H(\d+)$/.exec(tok);if(m){const h=+m[1];return T.cfg.cusp==='whole'?((C.lagna+h-1)%12)*30:norm(C.ascLon+30*(h-1))}
+  m=/^LordH(\d+)$/.exec(tok);if(m)return C.P[tjHL(C,+m[1])].lon;
+  if(tok==='LordLagna')return C.P[LORD[C.lagna]].lon;
+  m=/^LordOf:(\w+)$/.exec(tok);if(m&&PLANETS.includes(m[1]))return C.P[LORD[C.P[m[1]].sign]].lon;
+  m=/^Saham:(\w+)$/.exec(tok);if(m){const r=tjSaham(T,m[1].toLowerCase(),seen);if(r&&r.lon!=null)return r.lon;return null}
+  return null;
+}
+const tjIn30=(a,b,c)=>norm(c-b)<=norm(a-b);
+function tjSaham(T,id,seen){
+  seen=seen||[];if(seen.includes(id))return {err:'circular reference'};seen=seen.concat([id]);
+  const s=TJ_SH.find(x=>x.id===id);if(!s)return null;const u=T.cfg.shUser[id],day=tjIsDay(T);
+  let f=null,src='';
+  if(u&&(u.d||u.n)){f=day?(u.d||u.n):(u.n||u.d);src='user-defined (class D)'}else if(s.def){f=day?s.def[0]:s.def[1];src=s.src+' (class '+s.cls+')'}
+  if(!f)return {id,name:s.name,pending:true,src:'Formula not supplied or verified – RESEARCH PENDING'};
+  const r=tjEval(T,f,seen);if(r.err)return {id,name:s.name,err:r.err,formula:f};
+  let lon=r.lon,corr=null;
+  if(T.cfg.sh30!=='off'){const parts=String(f).replace(/\s+/g,'').match(/[+-]?[^+-]+/g);
+    if(parts&&parts.length===3&&parts[0][0]!=='-'&&parts[1][0]==='-'&&parts[2][0]!=='-'){const v=parts.map(p=>tjPoint(T,p.replace(/^[+-]/,''),seen));if(v.every(x=>x!=null)){const inside=tjIn30(v[0],v[1],T.A.ascLon);corr={inside,applied:!inside};if(!inside)lon=norm(lon+30)}}}
+  const sign=Math.floor(lon/30),C=T.A;
+  return {id,name:s.name,formula:f,day,lon,sign,deg:lon%30,house:tjHouse(C,sign),nak:tjNak(lon),disp:LORD[sign],trace:r.trace,src,corr,raw:r.lon,
+    conj:TJ7.filter(n=>C.P[n].sign===sign),asp:TJ7.filter(n=>{const k=((C.P[n].sign-sign)+12)%12;return [2,3,4,6,8,9,10].includes(k)})};
+}
+function tjTabSa(T){
+  const cfg=T.cfg,all=TJ_SH.map(s=>({s,r:tjSaham(T,s.id)})),sel=V.tjSa||cfg.shSel,cur=all.find(x=>x.s.id===sel)||all[0],r=cur.r,u=cfg.shUser[cur.s.id]||{},day=tjIsDay(T),cats=[...new Set(TJ_SH.map(s=>s.cat))];
+  return `<div class="card"><h3 style="margin-top:0">Sahams <span class="mute" style="font-weight:400;font-size:13px">(${TJ_SH.filter(s=>s.def&&s.cat.indexOf('Variants')<0).length} formulas loaded (35 supplied + Roga form, Santapa, Vyapara from Jagannatha Hora) ·${day?'day':'night'} birth for this annual chart)</span></h3>
+   <p class="mute" style="margin:0 0 6px;font-size:12px">Saham = (Point A − Point B + Point C) mod 360°; by night A and B are swapped (invariant Sahams are marked “same”). The 35 formulas were supplied by the Product Owner from an AI web summary (astroshruti.ai, vedastro.org, a Scribd list). They were then compared with the Sahama list of Jagannatha Hora for one day chart (14 November 2026, 12:56, South Grafton, Lahiri): 33 of the 35 supplied formulas agree with Jagannatha Hora to about one arc-minute (Roga differs and Manmatha was not visible in the screenshots), and Pitri and Rajya really are identical there. The comparison also fixed two rules: the 30° test uses the Lagna (not point C), and house points H2, H8, H9, H11 are equal-house cusps counted from the Lagna degree. Roga in Jagannatha Hora is Lagna − Moon + Lagna (listed separately); Santapa and Vyapara come from the same list (formulas inferred from one chart). Not checked: night births, other charts, any primary text. Stri, Kshema, Bhaya, Ayush and Bhagya are not in either list and stay RESEARCH PENDING. Points: Sun…Saturn, Lagna, Muntha, H1–H12, LordLagna, LordH&lt;n&gt;, LordOf:&lt;Planet&gt;, Saham:&lt;id&gt;, @&lt;degrees&gt;.</p>
+   <div class="row" style="gap:8px 12px"><label style="margin:0">30° correction<br>${tjSel('sh30',[['on','Apply (matches Jagannatha Hora): add 30° when the Lagna is not in the arc from B forward to A'],['off','Do not apply']],470)}</label><label style="margin:0">House points H2, H8, H9, H11<br>${tjSel('cusp',[['equal','Equal-house cusp = Lagna + 30° × (n − 1) (matches Jagannatha Hora)'],['whole','Start of the whole sign']],420)}</label></div>
+   ${cats.map(ct=>`<h4 style="margin:10px 0 4px">${ct}</h4><div style="overflow-x:auto"><table style="font-size:13px"><tr><th>Saham</th><th>Purpose</th><th>Formula (day / night)</th><th>Longitude</th><th>House</th><th>Dispositor</th></tr>${all.filter(x=>x.s.cat===ct).map(({s,r:x})=>`<tr style="cursor:pointer;${s.id===cur.s.id?'background:var(--acc2)':''}" onclick="V.tjSa='${s.id}';render()"><td><b>${s.name}</b></td><td class="mute">${s.purpose}</td><td class="mute" style="font-size:11px" translate="no">${s.def?(s.def[0]===s.def[1]?s.def[0]+' (same)':s.def[0]+' / '+s.def[1]):'–'}</td><td translate="no">${x&&x.lon!=null?tjLon(x.lon):'–'}</td><td>${x&&x.lon!=null?x.house:'–'}</td><td>${x&&x.lon!=null?x.disp:'–'}</td></tr>`).join('')}</table></div>`).join('')}</div>
+   <div class="card"><h3 style="margin-top:0">${cur.s.name} Saham</h3>${r&&r.lon!=null?`<table style="font-size:13px"><tr><td class="mute" style="width:230px">Formula used (${r.day?'day':'night'})</td><td translate="no">${esc(r.formula)}</td></tr><tr><td class="mute">Longitude / sign</td><td translate="no">${tjLon(r.lon)} · ${SIGNS[r.sign]}</td></tr><tr><td class="mute">30° correction</td><td>${r.corr?(r.corr.applied?'applied – the Lagna lies outside the arc from B forward to A':'not needed – the Lagna lies inside that arc'):'not applicable (not an A − B + C formula) or switched off'}</td></tr><tr><td class="mute">House / Nakshatra · Pada</td><td>${r.house} · ${r.nak}</td></tr><tr><td class="mute">Dispositor / its dignity</td><td>${r.disp} · ${tjDigOf(T.A,r.disp)}</td></tr><tr><td class="mute">Conjunct planets</td><td>${r.conj.join(', ')||'none'}</td></tr><tr><td class="mute">Aspecting planets (sign-based)</td><td>${r.asp.join(', ')||'none'}</td></tr><tr><td class="mute">Relation to Muntha</td><td>${r.sign===T.muntha.idx?'same sign as Muntha':[2,3,4,6,8,9,10].includes(((r.sign-T.muntha.idx)+12)%12)?'in Tajik aspect-relation to the Muntha sign':'no sign relation'}</td></tr><tr><td class="mute">Relation to Varshesha</td><td>${r.disp===T.vsel.final?'dispositor is the Varshesha':'Varshesha is '+T.vsel.final+' (sign '+SIGNS[T.A.P[T.vsel.final].sign]+')'}</td></tr><tr><td class="mute">Relevant houses / karaka (common mapping)</td><td>${cur.s.houses.join(', ')} · ${cur.s.karaka}</td></tr><tr><td class="mute">Source status</td><td class="mute">${esc(r.src||'')}</td></tr></table>${tjShow(T,r.trace.map(x=>x).concat(['Sum = '+tjFix(r.raw,4)+'° → mod 360']))}<p class="mute" style="margin:6px 0 0;font-size:12px">The Saham is read through its dispositor, house, aspects and the annual chart – never from its sign alone. ${TJ_NOTE}</p>`:`<p class="mute">${r?esc(r.src||r.err):''}</p>`}
+   <h4 style="margin:10px 0 4px">Your own formula for ${cur.s.name} <span class="mute" style="font-weight:400">(class D; leave blank to keep the library entry)</span></h4><div class="row"><label style="margin:0">Day formula<br><input value="${esc(u.d||'')}" style="width:260px" placeholder="Moon-Sun+Lagna" onchange="tjShU('${cur.s.id}','d',this.value)"></label><label style="margin:0">Night formula<br><input value="${esc(u.n||'')}" style="width:260px" placeholder="Sun-Moon+Lagna" onchange="tjShU('${cur.s.id}','n',this.value)"></label><button class="sm" onclick="tjShU('${cur.s.id}','d','');tjShU('${cur.s.id}','n','')">Clear</button></div></div>`;
+}
+function tjTests2(R,t,T){
+  const sh=TJ_SH.filter(s=>s.def&&s.cat.indexOf('Variants')<0&&s.cat.indexOf('Matched')<0);
+  t('The supplied list loads 35 Saham formulas','35',sh.length);
+  tjJhoraTest(R,t);
+  const split=f=>f.match(/[+-]?[^+-]+/g),swap=f=>{const p=split(f);return p.length===3&&p[0][0]!=='-'&&p[1][0]==='-'?p[1].slice(1)+'-'+p[0]+'+'+p[2].replace(/^\+/,''):null};
+  const bad=sh.filter(s=>s.def[0]!==s.def[1]&&swap(s.def[0])!==s.def[1]).map(s=>s.id);t('Night formula = day formula with A and B swapped for every non-invariant Saham (transcription check)','none',bad.join()||'none');
+  t('Invariant (same) Sahams: Bhratri, Artha, Labha, Vanik, Paradesa, Mrityu','6',sh.filter(s=>s.def[0]===s.def[1]).length);
+  t('Every supplied formula evaluates without an unknown point','none',sh.map(s=>tjSaham(T,s.id)).filter(r=>!r||r.err||r.lon==null).map(r=>r?r.name+': '+r.err:'?').join('; ')||'none');
+  t('Longitudes stay within 0–360°','true',sh.every(s=>{const r=tjSaham(T,s.id);return r.lon>=0&&r.lon<360}));
+  t('30° rule: C inside the arc from B to A – nothing added','true',tjIn30(100,50,70));
+  t('30° rule: C outside the arc – 30° is added','false',tjIn30(100,50,200));
+  t('30° rule across 0°: A 20°, B 350°, C 5° is inside','true',tjIn30(20,350,5));
+  const T2=Object.assign({},T,{cfg:Object.assign({},T.cfg,{sh30:'off'})}),a=tjSaham(T,'punya'),b=tjSaham(T2,'punya');
+  t('30° correction changes the longitude by exactly 30° when applied','0 or 30',tjFix(norm(a.lon-b.lon),6),[0,30].some(x=>Math.abs(norm(a.lon-b.lon)-x)<1e-6));
+  t('Jalapatana uses 15° Cancer = 105°','105',(()=>{const r=tjEval(T,'@105');return r.lon})());
+  t('Karyasiddhi uses the Sun\'s dispositor','true',(()=>{const r=tjSaham(T2,'karyasiddhi'),exp=norm(T.A.P.Saturn.lon-T.A.P.Sun.lon+T.A.P[LORD[T.A.P.Sun.sign]].lon),exn=norm(T.A.P.Sun.lon-T.A.P.Saturn.lon+T.A.P[LORD[T.A.P.Sun.sign]].lon),e=tjIsDay(T2)?exp:exn;return Math.abs(r.lon-e)<1e-6})());
+  t('Preeti depends on Sastra and Punya (nested Sahams resolve)','true',!!tjSaham(T,'preeti').lon);
+}
+const TJ_JH_CASE={c:{id:'jhref',name:'Jagannatha Hora reference',date:'2026-11-14',time:'12:56',tz:-5-6/3600,dst:0,lat:42+12/60+10/3600,lon:-(71+41/60+10/3600),ay:'lahiri',node:'mean',hs:'whole',vm:'para'},
+ v:{punya:[1,3,22,32.25],vidya:[8,3,21,33.25],yasas:[2,1,32,11.23],mitra:[9,26,49,28.70],mahatmya:[7,5,45,3.59],asha:[5,16,41,34.94],samartha:[3,20,2,30.56],bhratri:[3,20,35,39.88],gaurava:[2,1,32,11.23],pitri:[2,19,31,18.73],rajya:[2,19,31,18.73],matri:[2,2,52,59.66],putra:[5,6,44,26.35],jeeva:[5,16,8,25.62],karma:[7,23,26,10.67],roga_v1:[11,8,33,48.37],kali:[11,3,55,12.07],sastra:[11,28,9,0.61],bandhu:[7,16,7,9.11],mrityu:[6,8,33,48.37],paradesha:[11,8,4,45.28],artha:[5,5,11,24.77],paradara:[9,3,51,35.35],vanik:[1,20,36,56.39],karyasiddhi:[10,14,48,36.20],vivaha:[5,17,42,19.37],sraddha:[1,1,1,51.56],preeti:[8,28,8,31.11],jadya:[11,27,35,51.30],shatru:[3,20,2,30.56],jalapatana:[3,4,2,59.15],bandhana:[0,22,25,31.40],apamritu:[0,5,44,34.09],labha:[3,5,11,24.77],santapa:[5,19,30,49.22],vyapara:[3,20,2,30.56]}};
+function tjJhoraCompare(cfgOver){
+  const C=getC(TJ_JH_CASE.c),T={A:C,N:C,cfg:Object.assign(JSON.parse(JSON.stringify(TJ_DEF)),cfgOver||{}),muntha:{lon:0,idx:0},lat:TJ_JH_CASE.c.lat,lon:TJ_JH_CASE.c.lon,amsA:C.ms,adjMs:C.ms,tz:-5,dst:0},out=[];
+  for(const id in TJ_JH_CASE.v){const a=TJ_JH_CASE.v[id],jl=a[0]*30+a[1]+a[2]/60+a[3]/3600,r=tjSaham(T,id),d=r&&r.lon!=null?(norm(r.lon-jl+180)-180)*3600:null;out.push({id,jhora:jl,ours:r&&r.lon,diff:d,day:r&&r.day,corr:r&&r.corr})}
+  return out;
+}
+function tjJhoraTest(R,t){
+  const o=tjJhoraCompare(),ok=o.filter(x=>x.diff!=null&&Math.abs(x.diff)<=150),mx=Math.max(...o.map(x=>x.diff==null?1e9:Math.abs(x.diff)));
+  t('Compared with the Jagannatha Hora Sahama list (14 Nov 2026, 12:56, South Grafton, day chart): '+o.length+' Sahams within 2.5 arc-minutes','all '+o.length,ok.length+' of '+o.length+' (largest difference '+tjFix(mx,0)+'″)',ok.length===o.length);
+  const o2=tjJhoraCompare({sh30:'off'}),bad2=o2.filter(x=>x.diff==null||Math.abs(x.diff)>150).length;
+  t('Without the 30° rule many Sahams would differ from Jagannatha Hora by 30° (shows the rule matters)','> 10',bad2,bad2>10);
+  const o3=tjJhoraCompare({cusp:'whole'}),b3=o3.filter(x=>['artha','labha','mrityu','paradesha','apamritu','santapa'].includes(x.id)&&Math.abs(x.diff)>150).length;
+  t('With whole-sign cusps the cusp-based Sahams (Artha, Labha, Mrityu, Paradesa, Apamritu, Santapa) would not match Jagannatha Hora','> 3',b3,b3>3);
+}
+/* ============ KOTA CHAKRA – FORTRESS OF NAKSHATRAS (Astro Lab › Kota Chakra) ============
+   Layout: 28 nakshatras (with Abhijit) counted from the reference (Janma) nakshatra, four nested squares. The ring lists were taken from a
+   published description and checked against the user-supplied Jagannatha Hora screenshot (all 28 positions agree). The rules of
+   interpretation are modern (K.N. Rao / K.K. Joshi school as described on public pages); no classical verse could be read. A numeric
+   Vedha matrix could not be found anywhere, so Vedha is a user-defined research rule only. Nothing here is a prediction. */
+const KC_NAK=[['Ashwini','Aswi','Ketu'],['Bharani','Bhar','Venus'],['Krittika','Krit','Sun'],['Rohini','Rohi','Moon'],['Mrigashira','Mrig','Mars'],['Ardra','Ardr','Rahu'],['Punarvasu','Puna','Jupiter'],['Pushya','Push','Saturn'],['Ashlesha','Asre','Mercury'],['Magha','Magh','Ketu'],['Purva Phalguni','PPha','Venus'],['Uttara Phalguni','UPha','Sun'],['Hasta','Hast','Moon'],['Chitra','Chit','Mars'],['Swati','Swat','Rahu'],['Vishakha','Visa','Jupiter'],['Anuradha','Anu','Saturn'],['Jyeshtha','Jye','Mercury'],['Mula','Mool','Ketu'],['Purva Ashadha','PSha','Venus'],['Uttara Ashadha','USha','Sun'],['Abhijit','Abhi',''],['Shravana','Srav','Moon'],['Dhanishta','Dhan','Mars'],['Shatabhisha','Sata','Rahu'],['Purva Bhadrapada','PBha','Jupiter'],['Uttara Bhadrapada','UBha','Saturn'],['Revati','Reva','Mercury']];
+const KC_RINGS=[{id:'bahya',name:'Bahya (outer)',skt:'Bāhya',counts:[1,7,8,14,15,21,22,28],slots:['TL','T','TR','R','BR','B','BL','L']},{id:'prakara',name:'Praakaara (wall)',skt:'Prākāra',counts:[2,6,9,13,16,20,23,27],slots:['TL','T','TR','R','BR','B','BL','L']},{id:'durg',name:'Durgantara (interior)',skt:'Durgāntara',counts:[3,5,10,12,17,19,24,26],slots:['TL','T','TR','R','BR','B','BL','L']},{id:'stambha',name:'Stambha (pillar)',skt:'Stambha',counts:[4,11,18,25],slots:['T','R','B','L']}];
+const KC_POS={};KC_RINGS.forEach((r,ri)=>r.counts.forEach((c,si)=>{const s=r.slots[si],corner=['TL','TR','BR','BL'].includes(s);KC_POS[c]={ring:ri,slot:si,slotName:s,path:r.id==='stambha'?'pillar':corner?'entry':'exit'}}));
+const KC_DEF={cmode:'natal',ref:'nmoon',man:0,ulon:'',tdate:'',ttime:'',abh:'std',outer:'n',nodes:'both',psel:'all',pvis:{},lNat:1,lTr:1,sPl:1,sVe:1,sLb:1,swami:'auto',pala:'nlord',palaMan:'Saturn',ben:['Jupiter','Venus','Mercury','Moon'],vrule:'',vpl:'all',vmode:'all',
+ colBahya:'#ff9a8a',colPrak:'#ffbca8',colDurg:'#e9ffd9',colStam:'#c1ffa8',colRef:'#d4a017',colBen:'#1a7a1a',colMal:'#8b0000',colMix:'#d2691e',colNone:'#9a9a9a',colSel:'#1e6fe0',profiles:{},prof:'classical',mf:{pl:'',ring:'',nat:'',q:''}};
+function kcCfg(){if(!V.kcS){const st=(S.ui&&S.ui.kc)||{},d=JSON.parse(JSON.stringify(KC_DEF)),s=JSON.parse(JSON.stringify(st));V.kcS=Object.assign({},d,s);V.kcS.mf=Object.assign({},d.mf,s.mf||{});V.kcS.pvis=Object.assign({},s.pvis||{})}return V.kcS}
+function kcSave(){S.ui=S.ui||{};S.ui.kc=JSON.parse(JSON.stringify(V.kcS));save()}
+function kcSet(k,v){kcCfg()[k]=v;kcSave();render()}
+function kcSetMf(k,v){kcCfg().mf[k]=v;kcSave();render()}
+function kcGo(t){V.kct=t;render()}
+function kcPick(c){V.kcSel=c;render()}
+function kcPickPl(n){V.kcPl=V.kcPl===n?null:n;render()}
+function kcTogPl(n){const s=kcCfg();s.pvis[n]=s.pvis[n]===0?1:0;kcSave();render()}
+/* ---- Nakshatra engine (28 with Abhijit) ---- */
+const KC_AB0=276+40/60,KC_AB1=280+53/60+20/3600,KC_NL=360/27;
+function kcNakOf(lon,abh){
+  lon=norm(lon);
+  if(abh!=='none'&&lon>=KC_AB0&&lon<KC_AB1)return {i:21,start:KC_AB0,end:KC_AB1,pada:null};
+  const i27=Math.floor(lon/KC_NL);let i=i27<=20?i27:i27+1,start=i27*KC_NL,end=start+KC_NL;
+  if(abh!=='none'){if(i27===20)end=KC_AB0;if(i27===21)start=KC_AB1}
+  const pada=i27===20&&abh!=='none'?Math.floor((lon-start)/((end-start)/4))+1:Math.floor((lon-i27*KC_NL)/(KC_NL/4))+1;
+  return {i,start,end,pada,i27};
+}
+const kcCount=(x,j)=>((x-j+28)%28)+1;
+const kcIdx=(count,j)=>(j+count-1)%28;
+const kcPath=(count,rev)=>{const p=KC_POS[count].path;return rev?(p==='entry'?'exit':p==='exit'?'entry':p):p};
+/* ---- positions ---- */
+function kcNowIso(s){const n=new Date();return {date:s.tdate||n.toISOString().slice(0,10),time:s.ttime||n.toISOString().slice(11,16)}}
+function kcLayerChart(c,when,s){return getC(Object.assign({},c,{id:'kc-'+when.date+when.time,date:when.date,time:when.time,tz:0,dst:0}))}
+function kcPlanets(C,c,ms,s,layer){
+  const list=PLANETS.slice(),out=[];
+  if(s.outer==='y')['Uranus','Neptune','Pluto'].forEach(x=>list.push(x));
+  list.forEach(n=>{
+    if(n==='Rahu'&&(s.nodes==='ketu'||s.nodes==='none'))return;if(n==='Ketu'&&(s.nodes==='rahu'||s.nodes==='none'))return;
+    let lon,retro,spd;
+    if(['Uranus','Neptune','Pluto'].includes(n)){const T=(ms/86400000+2440587.5-2451545)/36525;lon=norm(tropLon(n,ms)-ayanOf(c,T));const d=norm(tropLon(n,ms+43200000)-tropLon(n,ms-43200000)+180)-180;retro=d<0;spd=d}
+    else{lon=C.P[n].lon;retro=!!C.P[n].retro||n==='Rahu'||n==='Ketu';spd=tjSpeed(n,ms,c.node||'mean')}
+    out.push({n,layer,lon,retro,spd,C});
+  });
+  return out;
+}
+function kcCalc(c0,s0){
+  const c=c0||curChart();if(!c)return null;const s=s0||kcCfg(),C0=getC(c),n0=kcNowIso(s),now=n0,tc=kcLayerChart(c,now,s),tms=Date.UTC(+now.date.slice(0,4),+now.date.slice(5,7)-1,+now.date.slice(8,10),+now.time.slice(0,2),+now.time.slice(3,5));
+  const nat=kcPlanets(C0,c,C0.ms,s,'natal'),tr=kcPlanets(tc,c,tms,s,'transit');
+  let refLon=null,refName='';
+  if(s.ref==='nmoon'){refLon=C0.P.Moon.lon;refName='natal Moon'}else if(s.ref==='tmoon'||s.ref==='prashna'){refLon=tc.P.Moon.lon;refName=s.ref==='prashna'?'Prashna Moon (date/time chosen)':'transit Moon'}else if(s.ref==='user'&&s.ulon!==''&&!isNaN(+s.ulon)){refLon=norm(+s.ulon);refName='user-defined longitude'}
+  const j=refLon!=null?kcNakOf(refLon,s.abh).i:(+s.man||0);if(refLon==null)refName=s.ref==='manual'?'manually selected nakshatra':'manual (no longitude)';
+  const layers=(cm=>cm==='natal'?['natal']:cm==='transit'?['transit']:['natal','transit'])(s.cmode),pls=[];
+  [['natal',nat],['transit',tr]].forEach(([L,arr])=>{if(!layers.includes(L))return;arr.forEach(p=>{if(s.pvis[p.n]===0)return;const nk=kcNakOf(p.lon,s.abh),cnt=kcCount(nk.i,j),pos=KC_POS[cnt],ben=s.ben.includes(p.n),mal=!ben;pls.push(Object.assign({},p,{nak:nk,i:nk.i,count:cnt,ring:pos.ring,slot:pos.slotName,path0:pos.path,path:kcPath(cnt,p.retro),ben,rev:p.retro&&pos.path!=='pillar'}))})});
+  const sel=s.psel==='ben'?pls.filter(p=>p.ben):s.psel==='mal'?pls.filter(p=>!p.ben):pls;
+  const refMoonLon=refLon,moonSign=refLon!=null?Math.floor(norm(refLon)/30):null;
+  let swami=s.swami==='auto'?(moonSign!=null?LORD[moonSign]:null):s.swami;
+  const nl=KC_NAK[j][2]||null,pala=s.pala==='man'?s.palaMan:s.pala==='nlord'?nl:null;
+  return {c,s,C0,tc,tms,now,j,refLon,refName,pls:sel,all:pls,swami,pala,nlord:nl,moonSign,layers};
+}
+/* ---- rules (modern description; class C) ---- */
+const KC_SRC={v:'vijayalur.com (blog) ',a:'theartofvedicastrology.com ',c:'astrocamp.com '};
+function kcFindings(K){
+  const F=[],P=K.all.filter(p=>K.s.psel==='all'||K.pls.includes(p)),ring=r=>P.filter(p=>p.ring===r),ben=P.filter(p=>p.ben),mal=P.filter(p=>!p.ben);
+  const core=P.filter(p=>p.ring>=2),outer=P.filter(p=>p.ring<=1);
+  core.filter(p=>p.ben).forEach(p=>F.push({id:'KC-R-001',cat:'prot',eff:'+',nak:p.nak.i,pl:p.n,text:p.n+' (benefic) is in the '+KC_RINGS[p.ring].name+' – benefics in the core strengthen the fort',src:KC_SRC.v+KC_SRC.c}));
+  core.filter(p=>!p.ben).forEach(p=>F.push({id:'KC-R-002',cat:'prot',eff:'-',nak:p.nak.i,pl:p.n,text:p.n+' (malefic) is in the '+KC_RINGS[p.ring].name+' – malefics in the core weaken the fort',src:KC_SRC.v+KC_SRC.c}));
+  outer.filter(p=>!p.ben).forEach(p=>F.push({id:'KC-R-003',cat:'threat',eff:'-',nak:p.nak.i,pl:p.n,text:p.n+' (malefic) is in the '+KC_RINGS[p.ring].name+' – malefics in the outer rings are adverse circumstances',src:KC_SRC.v}));
+  outer.filter(p=>p.ben).forEach(p=>F.push({id:'KC-R-004',cat:'threat',eff:'+',nak:p.nak.i,pl:p.n,text:p.n+' (benefic) is in the '+KC_RINGS[p.ring].name+' – benefics in the outer rings improve circumstances',src:KC_SRC.v}));
+  const entB=P.filter(p=>p.ben&&p.path==='entry'),exM=P.filter(p=>!p.ben&&p.path==='exit'),entM=P.filter(p=>!p.ben&&p.path==='entry'),exB=P.filter(p=>p.ben&&p.path==='exit');
+  if(entB.length&&exM.length)F.push({id:'KC-R-005',cat:'threat',eff:'+',pl:entB.map(p=>p.n).join(', ')+' / '+exM.map(p=>p.n).join(', '),text:'Benefics on entry paths ('+entB.map(p=>p.n).join(', ')+') with malefics on exit paths ('+exM.map(p=>p.n).join(', ')+') – the pattern described as winning',src:KC_SRC.v+KC_SRC.c});
+  if(entM.length&&exB.length)F.push({id:'KC-R-006',cat:'threat',eff:'-',pl:entM.map(p=>p.n).join(', ')+' / '+exB.map(p=>p.n).join(', '),text:'Malefics on entry paths ('+entM.map(p=>p.n).join(', ')+') with benefics on exit paths ('+exB.map(p=>p.n).join(', ')+') – described as Durga Bhanga Yoga (defeat of the fort)',src:KC_SRC.v});
+  P.filter(p=>!p.ben&&p.path==='exit').forEach(p=>F.push({id:'KC-R-007',cat:'threat',eff:'+',nak:p.nak.i,pl:p.n,text:p.n+' (malefic) is on an exit route – favourable',src:KC_SRC.a}));
+  P.filter(p=>!p.ben&&p.path==='entry').forEach(p=>F.push({id:'KC-R-008',cat:'threat',eff:'-',nak:p.nak.i,pl:p.n,text:p.n+' (malefic) is on an entry route – trouble moving inward',src:KC_SRC.a}));
+  P.filter(p=>p.rev).forEach(p=>F.push({id:'KC-E-001',cat:'note',eff:'~',nak:p.nak.i,pl:p.n,text:p.n+' is retrograde'+(p.n==='Rahu'||p.n==='Ketu'?' (the nodes are always retrograde)':'')+' – entry and exit are reversed for this planet ('+p.path0+' → '+p.path+')',src:KC_SRC.v+KC_SRC.a+KC_SRC.c}));
+  ['Saturn','Rahu','Ketu'].forEach(n=>P.filter(p=>p.n===n&&p.ring===3).forEach(p=>F.push({id:'KC-R-009',cat:'prot',eff:'-',nak:p.nak.i,pl:p.n,text:n+' is in the Stambha – misery, more so if inimical or debilitated ('+tjDigOf(p.C,n)+')',src:KC_SRC.a})));
+  ['Jupiter','Venus'].forEach(n=>P.filter(p=>p.n===n&&p.ring===3).forEach(p=>F.push({id:'KC-R-010',cat:'prot',eff:'+',nak:p.nak.i,pl:p.n,text:n+' is in the Stambha – protection',src:KC_SRC.a})));
+  const stam=['Saturn','Rahu','Ketu'].every(n=>P.some(p=>p.n===n&&p.ring===3)),jup=P.find(p=>p.n==='Jupiter'),jOk=jup&&(jup.ring>=2||jup.path==='exit');
+  if(stam&&!jOk)F.push({id:'KC-R-011',cat:'prot',eff:'-',pl:'Saturn, Rahu, Ketu',text:'Saturn, Rahu and Ketu are all in the Stambha and Jupiter is neither in the interior zones nor on an exit route – described as grave or long-lasting problems',src:KC_SRC.a});
+  const sw=P.find(p=>p.n===K.swami&&p.layer===(K.layers[0])),pa=P.find(p=>p.n===K.pala&&p.layer===(K.layers[0]));
+  if(sw){if(sw.ring===2)F.push({id:'KC-R-012',cat:'prot',eff:'+',pl:sw.n,nak:sw.nak.i,text:'Kota Swami '+sw.n+' is in the Durgantara (Madhya) – auspicious',src:KC_SRC.v});if(sw.n==='Saturn')F.push({id:'KC-R-014',cat:'prot',eff:'-',pl:sw.n,text:'Saturn as Kota Swami is a worrying indication',src:KC_SRC.v});if(['Moon','Mercury','Venus'].includes(sw.n))F.push({id:'KC-R-015',cat:'prot',eff:'~',pl:sw.n,text:sw.n+' as Kota Swami does less harm',src:KC_SRC.v})}
+  if(pa){if(pa.ring===0)F.push({id:'KC-R-013',cat:'prot',eff:'+',pl:pa.n,nak:pa.nak.i,text:'Kota Pala '+pa.n+' is in the Bahya – auspicious',src:KC_SRC.v});if(pa.n==='Saturn')F.push({id:'KC-R-014',cat:'prot',eff:'-',pl:pa.n,text:'Saturn as Kota Pala is a worrying indication',src:KC_SRC.v});if(['Moon','Mercury','Venus'].includes(pa.n))F.push({id:'KC-R-015',cat:'prot',eff:'~',pl:pa.n,text:pa.n+' as Kota Pala does less harm',src:KC_SRC.v})}
+  return F;
+}
+function kcVedha(K){
+  const s=K.s,txt=String(s.vrule||'').trim(),out=[];if(!txt)return out;
+  const ks=txt.split(/[\s,]+/).map(Number).filter(n=>Number.isInteger(n)&&n>=1&&n<=28);
+  K.all.filter(p=>s.vpl==='all'||s.vpl===p.n).forEach(p=>ks.forEach(k=>{const to=(p.i+k-1)%28;out.push({planet:p.n,layer:p.layer,from:p.i,to,count:k,rule:'KC-VD-D1',cls:'D',strength:1})}));
+  return out;
+}
+/* ---- geometry ---- */
+const KC_H=[350,273,195.5,116.5];
+function kcCell(ri,si){
+  const c=350;if(ri===3){const h=KC_H[3],tri=[[[c-h,c-h],[c+h,c-h],[c,c]],[[c+h,c-h],[c+h,c+h],[c,c]],[[c-h,c+h],[c+h,c+h],[c,c]],[[c-h,c-h],[c-h,c+h],[c,c]]][si],cx=[c,c+70,c,c-70][si],cy=[c-70,c,c+70,c][si];return {poly:tri,cx,cy,w:100}}
+  const Ho=KC_H[ri],Hi=KC_H[ri+1],t=Ho-Hi,x0=c-Ho,y0=c-Ho,x1=c+Ho,y1=c+Ho,i0=c-Hi,i1=c+Hi;
+  const B=[[x0,y0,t,t],[i0,y0,2*Hi,t],[i1,y0,t,t],[i1,i0,t,2*Hi],[i1,i1,t,t],[i0,i1,2*Hi,t],[x0,i1,t,t],[x0,i0,t,2*Hi]][si];
+  return {x:B[0],y:B[1],w:B[2],h:B[3],cx:B[0]+B[2]/2,cy:B[1]+B[3]/2};
+}
+function kcSvg(K){
+  const s=K.s,sel=V.kcSel,selPl=V.kcPl,cols=[s.colBahya,s.colPrak,s.colDurg,s.colStam],z=V.kcZ||{z:1,x:0,y:0},vb=700/z.z,bx=(700-vb)/2+z.x,by=(700-vb)/2+z.y;
+  const ved=s.sVe?kcVedha(K):[];let g='';
+  KC_RINGS.forEach((r,ri)=>{const sq=KC_H[ri],c=350;if(ri<3)g+=`<rect x="${c-sq}" y="${c-sq}" width="${2*sq}" height="${2*sq}" fill="${cols[ri]}" stroke="#222" stroke-width="2.5"/>`;else g+=`<rect x="${c-sq}" y="${c-sq}" width="${2*sq}" height="${2*sq}" fill="${cols[3]}" stroke="#222" stroke-width="2.5"/>`});
+  const cellPlan={};
+  KC_RINGS.forEach((r,ri)=>r.counts.forEach((cnt,si)=>{
+    const cell=kcCell(ri,si),idx=kcIdx(cnt,K.j),nm=KC_NAK[idx],pl=K.pls.filter(p=>p.i===idx),isRef=idx===K.j,isSel=sel===cnt,hl=selPl&&pl.some(p=>p.n===selPl);
+    const stroke=isRef?s.colRef:isSel?'#000':hl?s.colSel:'rgba(0,0,0,.18)',sw=isRef?5:isSel?3.5:hl?4:1;
+    const shape=cell.poly?`<polygon points="${cell.poly.map(p=>p.join(',')).join(' ')}" fill="${isRef?s.colRef+'66':'transparent'}" stroke="${stroke}" stroke-width="${sw}" style="cursor:pointer" onclick="kcPick(${cnt})"/>`:`<rect x="${cell.x}" y="${cell.y}" width="${cell.w}" height="${cell.h}" fill="${isRef?s.colRef+'66':'transparent'}" stroke="${stroke}" stroke-width="${sw}" style="cursor:pointer" onclick="kcPick(${cnt})"/>`;
+    g+=shape;cellPlan[idx]=cell;
+    if(s.sLb)g+=`<text x="${cell.cx}" y="${cell.cy-(cell.poly?22:(cell.h||60)/2-16)}" text-anchor="middle" font-size="15" fill="#2a2a55" style="pointer-events:none">${nm[1]}${s.sLb==2?' '+(cnt):''}</text>`;
+    if(s.sPl&&pl.length){const fs=pl.length>3?15:pl.length>2?19:24,txt=pl.map(p=>{const col=p.n===selPl?s.colSel:(p.ben?s.colBen:s.colMal),lab=AB[p.n]||p.n.slice(0,2),t=p.retro?'('+lab+')':lab;return `<tspan fill="${col}" font-weight="${p.layer==='transit'?'400':'700'}" text-decoration="${p.layer==='transit'?'underline':'none'}">${t}${p.layer==='transit'&&K.layers.length>1?'ᵗ':''}</tspan>`}).join('<tspan> </tspan>');
+      g+=`<text x="${cell.cx}" y="${cell.cy+(cell.poly?0:10)}" text-anchor="middle" font-size="${fs}" style="pointer-events:none">${txt}</text>`}
+  }));
+  ved.forEach(v=>{if(selPl&&v.planet!==selPl)return;const a=cellPlan[v.from],b=cellPlan[v.to];if(!a||!b||v.from===v.to)return;g+=`<line x1="${a.cx}" y1="${a.cy}" x2="${b.cx}" y2="${b.cy}" stroke="${v.layer==='transit'?'#7a3ec9':'#0a6ea8'}" stroke-width="2" stroke-dasharray="6 4" marker-end="url(#kca)"/>`});
+  const names=['Bahya','Praakaara','Durgantara','Stambha'];
+  return `<svg id="kcsvg" viewBox="${bx} ${by} ${vb} ${vb}" style="width:100%;max-width:760px;background:#fff;border:1px solid var(--line)" xmlns="http://www.w3.org/2000/svg"><defs><marker id="kca" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#555"/></marker></defs>${g}<text x="12" y="22" font-size="16" fill="#1a5d1a">Kota Swami: ${K.swami||'–'}</text><text x="688" y="22" text-anchor="end" font-size="16" fill="#a02020">Kota Pala: ${K.pala||'–'}</text></svg>`;
+}
+function kcZoom(f){const z=V.kcZ||{z:1,x:0,y:0};z.z=Math.max(1,Math.min(6,z.z*f));if(z.z===1){z.x=0;z.y=0}V.kcZ=z;render()}
+function kcPan(dx,dy){const z=V.kcZ||{z:1,x:0,y:0};z.x+=dx*(700/z.z)/4;z.y+=dy*(700/z.z)/4;V.kcZ=z;render()}
+function kcFull(){const e=document.getElementById('kcbox');if(e&&e.requestFullscreen)e.requestFullscreen()}
+function kcExport(){const sv=document.getElementById('kcsvg');if(!sv)return;const x=new XMLSerializer().serializeToString(sv),img=new Image(),url='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(x);img.onload=()=>{const cv=document.createElement('canvas');cv.width=cv.height=1400;const g=cv.getContext('2d');g.fillStyle='#fff';g.fillRect(0,0,1400,1400);g.drawImage(img,0,0,1400,1400);cv.toBlob(b=>{const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='kota-chakra.png';a.click()})};img.src=url}
+/* ---- tests ---- */
+function kcTests(){
+  const R=[],t=(n,exp,got,ok)=>R.push({n,exp,got,ok:ok===undefined?String(exp)===String(got):ok}),s0=Object.assign(JSON.parse(JSON.stringify(KC_DEF)),{});
+  const j=20,ringNames=r=>KC_RINGS[r].counts.map(c=>KC_NAK[kcIdx(c,j)][1]).join(' ');
+  t('Janma Uttarashadha: Bahya ring (as in the Jagannatha Hora screenshot, clockwise from the top-left)','USha UBha Reva Ardr Puna Hast Chit PSha',ringNames(0));
+  t('Janma Uttarashadha: Praakaara ring','Abhi PBha Aswi Mrig Push UPha Swat Mool',ringNames(1));
+  t('Janma Uttarashadha: Durgantara ring','Srav Sata Bhar Rohi Asre PPha Visa Jye',ringNames(2));
+  t('Janma Uttarashadha: Stambha (top, right, bottom, left)','Dhan Krit Magh Anu',ringNames(3));
+  t('All 28 counts are placed exactly once','28',Object.keys(KC_POS).length);
+  const seen=new Set();KC_RINGS.forEach(r=>r.counts.forEach(c=>seen.add(c)));t('Every count 1–28 appears in exactly one ring slot','true',seen.size===28&&[...Array(28).keys()].every(i=>seen.has(i+1)));
+  t('Ring sizes are 8, 8, 8 and 4','8,8,8,4',KC_RINGS.map(r=>r.counts.length).join());
+  t('Entry paths are the corner slots and exit paths the middle slots','entry,exit,entry,exit',[KC_POS[1],KC_POS[7],KC_POS[8],KC_POS[14]].map(p=>p.path).join());
+  t('Nakshatra of 266°40′ (start of Uttarashadha) is Uttarashadha','Uttara Ashadha',KC_NAK[kcNakOf(266.6667+0.001,'std').i][0]);
+  t('276°40′ is the start of Abhijit','Abhijit',KC_NAK[kcNakOf(276+40/60,'std').i][0]);
+  t('280°00′ is still Abhijit','Abhijit',KC_NAK[kcNakOf(280,'std').i][0]);
+  t('280°53′21″ is Shravana','Shravana',KC_NAK[kcNakOf(280+53/60+21/3600,'std').i][0]);
+  t('Without the Abhijit segment 278° is Uttarashadha','Uttara Ashadha',KC_NAK[kcNakOf(278,'none').i][0]);
+  t('0° is Ashwini, 359° is Revati','Ashwini,Revati',KC_NAK[kcNakOf(0,'std').i][0]+','+KC_NAK[kcNakOf(359,'std').i][0]);
+  t('Pada of 10° (Ashwini): 4th pada starts at 10°','4',kcNakOf(10.0001,'std').pada);
+  t('Count of Janma itself is 1; the 28th is the nakshatra before it','1,28',kcCount(5,5)+','+kcCount(4,5));
+  t('Retrograde reverses entry and exit; the pillar is unaffected','exit,entry,pillar',[kcPath(1,true),kcPath(7,true),kcPath(4,true)].join());
+  const sc=Object.assign({},s0,{ref:'manual',man:20,vrule:'1,7',vpl:'Sun'}),c0={id:'kt',name:'T',date:'1990-08-15',time:'10:30',tz:5.5,dst:0,lat:23.02,lon:72.57,ay:'lahiri',node:'mean',hs:'whole',vm:'para'},K=kcCalc(c0,sc);
+  t('Manual reference nakshatra: Uttarashadha','Uttara Ashadha',KC_NAK[K.j][0]);
+  t('Every planet receives a count 1–28','true',K.all.every(p=>p.count>=1&&p.count<=28));
+  t('Nine planets are plotted in the natal layer','9',K.all.length);
+  const kn=kcCalc(c0,Object.assign({},s0,{nodes:'none',ref:'nmoon'}));t('Excluding the nodes leaves seven planets','7',kn.all.length);
+  const kr=kcCalc(c0,Object.assign({},s0,{ref:'nmoon'}));t('Natal Moon reference: the Moon is at count 1','1',kr.all.find(p=>p.n==='Moon').count);
+  const vd=kcVedha(K);t('User-defined Vedha rule 1,7 for the Sun gives two relations','2',vd.length);
+  t('Vedha target is 6 nakshatras after the planet','true',(()=>{const sun=K.all.find(p=>p.n==='Sun');return vd.some(v=>v.count===7&&v.to===(sun.i+6)%28)})());
+  t('No Vedha is produced when no rule is entered','0',kcVedha(Object.assign({},K,{s:Object.assign({},K.s,{vrule:''})})).length);
+  t('Combined mode plots natal and transit layers','natal,transit',kcCalc(c0,Object.assign({},s0,{cmode:'combined'})).layers.join());
+  t('Findings are produced without error','true',(()=>{try{kcFindings(K);return true}catch(e){return e.message}})());
+  return R;
+}
+/* ============ KOTA CHAKRA – interface ============ */
+const KC_TABS=[['dg','Kota Chakra'],['pl','Nakshatra placement'],['vd','Planetary Vedha'],['st','Strength & influence'],['ip','Interpretation'],['mx','Vedha matrix'],['rs','Research & configuration']];
+const KC_NOTE='Rules of interpretation come from modern published descriptions (blogs of the K.N. Rao / K.K. Joshi method); no classical verse could be read. Indications only – not predictions.';
+const kcSel=(k,list,w)=>`<select ${w?'style="min-width:'+w+'px"':''} onchange="kcSet('${k}',this.value)">${opt(list,kcCfg()[k])}</select>`;
+const kcDMS=x=>{const d=Math.floor(x),m=Math.floor((x-d)*60),s=Math.round(((x-d)*60-m)*60);return d+'°'+String(m).padStart(2,'0')+"'"+String(s).padStart(2,'0')+'"'};
+const kcRashi=i=>{const n=KC_NAK[i];const st=i===21?KC_AB0:(i<=20?i*KC_NL:(i-1)*KC_NL),en=i===21?KC_AB1:(i===20?KC_AB0:(i<=20?(i+1)*KC_NL:i*KC_NL));return [...new Set([Math.floor(st/30),Math.floor((en-1e-6)/30)])].map(x=>SIGNS[x]).join(' / ')};
+const kcNat=p=>p.ben?'benefic':'malefic';
+function kcPanel(K){
+  const s=K.s,nakOpts=KC_NAK.map((n,i)=>[i,(i+1)+'. '+n[0]]);
+  const tog=(k,l)=>`<label style="display:inline;margin:0"><input type="checkbox" ${s[k]?'checked':''} onchange="kcSet('${k}',this.checked?1:0)"> ${l}</label>`;
+  return `<details class="card noprint" open><summary><b>Preferences</b> <span class="mute">(profile: ${esc(s.prof)})</span></summary>
+   <div class="row" style="margin-top:8px;gap:8px 12px"><label style="margin:0">Chart<br>${chartSel(K.c)}</label><label style="margin:0">Planets plotted<br>${kcSel('cmode',[['natal','Natal'],['transit','Transit'],['combined','Natal + transit (combined)']])}</label><label style="margin:0">Reference nakshatra<br>${kcSel('ref',[['nmoon','Natal Moon nakshatra'],['tmoon','Transit Moon nakshatra'],['prashna','Prashna Moon (date and time below)'],['manual','Manually selected nakshatra'],['user','User-defined longitude']],260)}</label>${s.ref==='manual'?`<label style="margin:0">Nakshatra<br><select onchange="kcSet('man',+this.value)">${opt(nakOpts,+s.man)}</select></label>`:''}${s.ref==='user'?`<label style="margin:0">Longitude (°)<br><input value="${esc(s.ulon)}" style="width:90px" onchange="kcSet('ulon',this.value)"></label>`:''}<span class="mute">Reference: <b>${KC_NAK[K.j][0]}</b> (${K.refName})</span></div>
+   <div class="row" style="margin-top:8px;gap:8px 12px"><label style="margin:0">Transit / Prashna date (UTC)<br><input type="date" value="${K.now.date}" onchange="kcSet('tdate',this.value)"></label><label style="margin:0">Time (UTC)<br><input type="time" value="${K.now.time}" onchange="kcSet('ttime',this.value)"></label><button class="sm" onclick="kcSet('tdate','');kcSet('ttime','')">Now</button><label style="margin:0">Abhijit<br>${kcSel('abh',[['std','Segment 276°40′ – 280°53′20″ (28 nakshatras)'],['none','No Abhijit segment (research; layout needs 28)']],300)}</label><label style="margin:0">Nodes<br>${kcSel('nodes',[['both','Rahu and Ketu independently'],['rahu','Rahu only'],['ketu','Ketu only'],['none','Exclude nodes']])}</label><label style="margin:0">Outer planets<br>${kcSel('outer',[['n','Excluded (traditional)'],['y','Include Uranus, Neptune, Pluto']])}</label><label style="margin:0">Planet selection<br>${kcSel('psel',[['all','All plotted planets'],['ben','Benefics only'],['mal','Malefics only']])}</label></div>
+   <div class="row" style="margin-top:8px;gap:8px 12px"><label style="margin:0">Kota Swami (fort lord)<br>${kcSel('swami',[['auto','Lord of the reference Moon sign']].concat(TJ7.map(p=>[p,p])),220)}</label><label style="margin:0">Kota Pala (fort guard)<br>${kcSel('pala',[['nlord','Lord of the reference nakshatra'],['man','Manual planet'],['none','Not used']],240)}</label>${s.pala==='man'?`<label style="margin:0">Planet<br><select onchange="kcSet('palaMan',this.value)">${opt(TJ7.map(p=>[p,p]),s.palaMan)}</select></label>`:''}<span class="mute">Swami <b>${K.swami||'–'}</b> · Pala <b>${K.pala||'–'}</b></span></div>
+   <p class="mute" style="margin:6px 0 0;font-size:12px">The definition of Kota Pala differs between sources (lord of the nakshatra, lord of the pada, planet of the first letter of the name). The Jagannatha Hora screenshot you supplied shows Saturn as Kota Pala for its chart; the rule that produces that value could not be identified, so it is not reproduced – choose the planet manually if needed.</p>
+   <div class="row" style="margin-top:8px;gap:8px 14px">${tog('sPl','Planet symbols')}${tog('sVe','Vedha lines')}<label style="margin:0;display:inline">Labels <select onchange="kcSet('sLb',+this.value)">${opt([[1,'Nakshatra names'],[2,'Names and counts'],[0,'Hidden']],+s.sLb)}</select></label></div>
+   <div class="row" style="margin-top:6px;gap:6px 12px"><span class="mute">Planets shown:</span>${PLANETS.concat(s.outer==='y'?['Uranus','Neptune','Pluto']:[]).map(n=>`<label style="margin:0;display:inline"><input type="checkbox" ${s.pvis[n]===0?'':'checked'} onchange="kcTogPl('${n}')"> ${n}</label>`).join('')}</div>
+   <div class="row" style="margin-top:8px;gap:6px 12px"><span class="mute">Colours:</span>${[['colBahya','Outer'],['colPrak','Wall'],['colDurg','Interior'],['colStam','Pillar'],['colRef','Reference'],['colBen','Benefic'],['colMal','Malefic'],['colMix','Mixed'],['colNone','No influence'],['colSel','Selected planet']].map(([k,l])=>`<label style="margin:0;display:inline">${l} <input type="color" value="${s[k]}" onchange="kcSet('${k}',this.value)"></label>`).join('')}<button class="sm" onclick="kcResetCols()">Reset colours</button></div></details>`;
+}
+function kcResetCols(){const s=kcCfg(),d=KC_DEF;['colBahya','colPrak','colDurg','colStam','colRef','colBen','colMal','colMix','colNone','colSel'].forEach(k=>s[k]=d[k]);kcSave();render()}
+function kcCellDetail(K,cnt){
+  const idx=kcIdx(cnt,K.j),n=KC_NAK[idx],pos=KC_POS[cnt],r=KC_RINGS[pos.ring],pl=K.all.filter(p=>p.i===idx),ved=kcVedha(K).filter(v=>v.to===idx),F=kcFindings(K).filter(f=>f.nak===idx);
+  return `<div class="card" style="margin-top:8px"><h3 style="margin-top:0">${n[0]} <span class="mute" style="font-weight:400;font-size:13px">${idx===K.j?'· reference nakshatra':''}</span></h3><table style="font-size:13px"><tr><td class="mute" style="width:210px">Number (28-system) / count from the reference</td><td>${idx+1} / ${cnt}</td></tr><tr><td class="mute">Rashi</td><td>${kcRashi(idx)}</td></tr><tr><td class="mute">Planetary ruler</td><td>${n[2]||'– (Abhijit has no Vimshottari lord)'}</td></tr><tr><td class="mute">Kota division</td><td>${r.name}, ${pos.slotName} position – ${pos.path==='entry'?'entry path (corner)':pos.path==='exit'?'exit path (side middle)':'pillar'}</td></tr><tr><td class="mute">Planets here</td><td>${pl.map(p=>p.n+(p.retro?' (R)':'')+' ['+p.layer+', '+kcNat(p)+']').join(', ')||'none'}</td></tr><tr><td class="mute">Vedha-causing planets (user rule)</td><td>${ved.map(v=>v.planet+' ('+v.layer+', count '+v.count+')').join(', ')||'none – no verified Vedha rule is loaded'}</td></tr><tr><td class="mute">Relation to the reference</td><td>${cnt===1?'this is the reference':'the '+cnt+(cnt===2?'nd':cnt===3?'rd':'th')+' nakshatra counted from it'}</td></tr><tr><td class="mute">Rules applying here</td><td>${F.map(f=>f.id+': '+esc(f.text)).join('<br>')||'none'}</td></tr></table>${tjShow?'':''}<details style="margin-top:6px"><summary class="mute" style="font-size:12px">Show calculation</summary><div style="font-size:12px;margin-top:4px">Count = ((nakshatra number − reference number + 28) mod 28) + 1 = ((${idx+1} − ${K.j+1} + 28) mod 28) + 1 = ${cnt}. Ring and slot come from the layout table in the Research tab.</div></details></div>`;
+}
+function kcTabDg(K){
+  const sel=V.kcSel,z=V.kcZ||{z:1};
+  return `<div class="card" id="kcbox"><div class="row"><b>Kota Chakra – Fortress of Nakshatras</b><span class="mute">Reference <b>${KC_NAK[K.j][0]}</b> at the outer top-left corner · ${K.layers.join(' + ')} · ${K.all.length} planets</span></div>
+   <div class="row noprint" style="margin-top:6px;gap:6px"><button class="sm" onclick="kcZoom(1.25)">Zoom in</button><button class="sm" onclick="kcZoom(0.8)">Zoom out</button><button class="sm" onclick="kcPan(-1,0)">◀</button><button class="sm" onclick="kcPan(0,-1)">▲</button><button class="sm" onclick="kcPan(0,1)">▼</button><button class="sm" onclick="kcPan(1,0)">▶</button><button class="sm" onclick="V.kcZ=null;render()">Reset</button><button class="sm" onclick="kcFull()">Full screen</button><button class="sm" onclick="kcExport()">Export image</button><button class="sm" onclick="window.print()">Print</button><span class="mute">Click a nakshatra, or a planet below, to highlight it.</span></div>
+   <div class="row noprint" style="margin-top:6px;gap:4px">${K.all.filter((p,i,a)=>a.findIndex(x=>x.n===p.n)===i).map(p=>`<button class="sm ${V.kcPl===p.n?'on':''}" onclick="kcPickPl('${p.n}')" style="color:${p.ben?K.s.colBen:K.s.colMal}">${p.n}</button>`).join('')}</div>
+   <div style="margin-top:8px">${kcSvg(K)}</div>
+   <p class="mute" style="margin:6px 0 0;font-size:12px">Rings from outside: Bahya (exterior), Praakaara (wall), Durgantara (interior), Stambha (pillar). Corner positions are entry paths and side-middle positions are exit paths. (Planet) in brackets = retrograde; underlined = transit planet in combined mode. Colours: green benefic, dark red malefic (configurable).</p></div>
+   ${V.kcPl?kcPlanetPanel(K,V.kcPl):''}${sel?kcCellDetail(K,sel):''}`;
+}
+function kcPlanetPanel(K,n){
+  const ps=K.all.filter(p=>p.n===n),ved=kcVedha(K).filter(v=>v.planet===n);
+  return `<div class="card" style="margin-top:8px"><h3 style="margin-top:0">${n}</h3><table style="font-size:13px"><tr><th>Layer</th><th>Longitude</th><th>Nakshatra</th><th>Division</th><th>Path</th><th>Vedha relations (user rule)</th></tr>${ps.map(p=>`<tr><td>${p.layer}</td><td translate="no">${kcDMS(p.lon%30)} ${SIGNS[Math.floor(p.lon/30)].slice(0,3)}</td><td>${KC_NAK[p.i][0]}</td><td>${KC_RINGS[p.ring].name}, ${p.slot}</td><td>${p.path}${p.rev?' (reversed: retrograde)':''}</td><td>${ved.filter(v=>v.layer===p.layer).map(v=>KC_NAK[v.to][1]).join(', ')||'none'}</td></tr>`).join('')}</table></div>`;
+}
+function kcTabPl(K){
+  const rows=K.all.map(p=>{const C=p.C,ni=p.nak;return `<tr><td><b>${p.n}</b></td><td>${p.layer}</td><td translate="no">${kcDMS(p.lon%30)} ${SIGNS[Math.floor(p.lon/30)].slice(0,3)} (${p.lon.toFixed(4)}°)</td><td>${KC_NAK[p.i][0]}</td><td>${ni.pada||'–'}</td><td>${SIGNS[Math.floor(p.lon/30)]}</td><td>${p.retro?'Retrograde':'Direct'}</td><td translate="no">${p.spd==null?'–':p.spd.toFixed(3)}</td><td>${KC_RINGS[p.ring].name} · ${p.slot} · count ${p.count}</td><td>${PLANETS.includes(p.n)&&p.n!=='Rahu'&&p.n!=='Ketu'?tjDigOf(C,p.n):'–'}</td><td>${PLANETS.includes(p.n)&&COMB[p.n]?(tjComb(C,p.n)?'combust':'–'):'–'}</td><td>${LORD[Math.floor(p.lon/30)]}</td><td>${KC_NAK[p.i][2]||'–'}</td></tr>`}).join('');
+  const m=K.all.find(p=>p.n==='Moon'),ex=m?`Moon = ${kcDMS(m.lon%30)} in ${SIGNS[Math.floor(m.lon/30)]} (${m.lon.toFixed(4)}°). Nakshatra index = FLOOR(${m.lon.toFixed(4)} / 13°20′) = ${Math.floor(m.lon/KC_NL)} → ${KC_NAK[m.i][0]}${m.nak.pada?'; pada = FLOOR((longitude − nakshatra start) / 3°20′) + 1 = '+m.nak.pada:''}. In the 28-system the sequence skips to Abhijit between 276°40′ and 280°53′20″.`:'';
+  return `<div class="card"><h3 style="margin-top:0">Nakshatra placement</h3><div style="overflow-x:auto"><table style="font-size:12px"><tr><th>Planet</th><th>Layer</th><th>Longitude</th><th>Nakshatra</th><th>Pada</th><th>Rashi</th><th>Motion</th><th>Speed °/day</th><th>Kota division</th><th>Dignity</th><th>Combustion</th><th>Dispositor</th><th>Nakshatra lord</th></tr>${rows}</table></div>
+   <p class="mute" style="margin:6px 0 0;font-size:12px">Dignity is shown as a secondary modifier only; it does not change the placement or the traditional rule results. Uranus, Neptune and Pluto (when included) have no dignity. Longitudes use the chart's ayanamsha.</p><details style="margin-top:6px"><summary class="mute" style="font-size:12px">Show calculation</summary><div style="font-size:12px;margin-top:4px">${ex}</div></details></div>`;
+}
+function kcTabVd(K){
+  const s=K.s,V0=kcVedha(K),by={};V0.forEach(v=>{by[v.to]=(by[v.to]||0)+1});
+  const list=s.vmode==='strong'?V0.filter(v=>by[v.to]===Math.max(...Object.values(by))):V0;
+  return `<div class="card"><h3 style="margin-top:0">Planetary Vedha</h3><div class="warn-box" style="border-left:4px solid var(--warn);padding:6px 10px;margin-bottom:8px"><b>Traditional Vedha result: not available.</b> No numeric Vedha rule (which nakshatra is struck by which) could be found in any readable source; the only “Vedha” rules found belong to the Sarvatobhadra Chakra, which is a different diagram. The Kota Chakra rules that are known act through rings and paths (see Strength & influence). The tool below is a <b>user-defined research rule</b> (class D) and is not a classical result.</div>
+   <div class="row" style="gap:8px 12px"><label style="margin:0">Research rule – counts struck, counted from the planet's own nakshatra (1 = its own)<br><input value="${esc(s.vrule)}" placeholder="e.g. 1, 7, 8" style="width:240px" onchange="kcSet('vrule',this.value)"></label><label style="margin:0">Planets<br>${kcSel('vpl',[['all','All plotted planets']].concat(PLANETS.map(p=>[p,p])))}</label><label style="margin:0">Multiple Vedha<br>${kcSel('vmode',[['all','Show every relation separately'],['strong','Strongest (most struck) nakshatra only']],260)}</label></div>
+   <p class="mute" style="margin:6px 0 0;font-size:12px">Reference point: ${KC_NAK[K.j][0]} (${K.refName}). Vedha convention: user-defined research rule only. Node treatment: ${s.nodes}.</p></div>
+   <div class="card"><div style="overflow-x:auto"><table style="font-size:13px"><tr><th>Reference</th><th>Affected nakshatra</th><th>Planet</th><th>Planet position</th><th>Category</th><th>Direction (counted)</th><th>Strength</th><th>Struck by</th><th>Rule ID</th></tr>${list.map(v=>{const p=K.all.find(x=>x.n===v.planet&&x.layer===v.layer);return `<tr><td>${KC_NAK[K.j][1]}</td><td><b>${KC_NAK[v.to][0]}</b></td><td>${v.planet} (${v.layer})</td><td translate="no">${kcDMS(p.lon%30)} ${SIGNS[Math.floor(p.lon/30)].slice(0,3)}</td><td>user-defined (class D)</td><td>+${v.count-1} forward from ${KC_NAK[v.from][1]}</td><td>${v.strength}</td><td>${by[v.to]} planet(s)</td><td>${v.rule}</td></tr>`}).join('')||'<tr><td colspan="9" class="mute">No Vedha relations: no research rule has been entered.</td></tr>'}</table></div>
+   <details style="margin-top:6px"><summary class="mute" style="font-size:12px">Show calculation</summary><div style="font-size:12px;margin-top:4px">Reference nakshatra = ${KC_NAK[K.j][0]}. For each planet the struck nakshatra = (planet nakshatra number + k − 1) mod 28 for every k in the rule. Selected Vedha rule = KC-VD-D1 (user-defined). Result = Vedha if the affected nakshatra is in that list, otherwise no Vedha.</div></details></div>`;
+}
+function kcTabSt(K){
+  const F=kcFindings(K),s=K.s,cnt=r=>K.all.filter(p=>p.ring===r),ec=e=>e==='+'?'var(--ok)':e==='-'?'var(--bad)':'var(--warn)';
+  return `<div class="card"><h3 style="margin-top:0">Strength and influence <span class="mute" style="font-weight:400;font-size:13px">(traditional rule results – kept separate from any research scoring)</span></h3><table style="font-size:13px"><tr><th>Division</th><th>Benefics</th><th>Malefics</th><th>Influence</th></tr>${KC_RINGS.map((r,i)=>{const b=cnt(i).filter(p=>p.ben).map(p=>p.n),m=cnt(i).filter(p=>!p.ben).map(p=>p.n),col=b.length&&m.length?s.colMix:b.length?s.colBen:m.length?s.colMal:s.colNone;return `<tr><td>${r.name}</td><td>${b.join(', ')||'–'}</td><td>${m.join(', ')||'–'}</td><td style="color:${col};font-weight:700">${b.length&&m.length?'mixed':b.length?'benefic':m.length?'malefic':'none'}</td></tr>`}).join('')}</table>
+   <p class="mute" style="margin:6px 0 0;font-size:12px">Benefics are ${s.ben.join(', ')} (the Moon, Mercury and Venus are treated as benefic here as in the Jagannatha Hora colouring); the rest are malefic. Core = Stambha and Durgantara; circumstances = Praakaara and Bahya.</p></div>
+   <div class="card"><h3 style="margin-top:0">Rule results</h3><table style="font-size:13px"><tr><th>Rule</th><th>Effect</th><th>Finding</th><th>Source (class C, unverified)</th></tr>${F.map(f=>`<tr><td>${f.id}</td><td style="color:${ec(f.eff)};font-weight:700">${f.eff==='+'?'supportive':f.eff==='-'?'challenging':'note'}</td><td>${esc(f.text)}</td><td class="mute" style="font-size:12px">${esc(f.src||'')}</td></tr>`).join('')||'<tr><td colspan="4" class="mute">No rule applies to the plotted planets.</td></tr>'}</table></div>
+   <div class="card"><h3 style="margin-top:0">Dignity as a secondary modifier</h3><div style="overflow-x:auto"><table style="font-size:13px"><tr><th>Planet</th><th>Dignity</th><th>Combust</th><th>Retrograde</th><th>Note</th></tr>${K.all.filter(p=>['Sun','Moon','Mars','Mercury','Jupiter','Venus','Saturn'].includes(p.n)).map(p=>`<tr><td>${p.n} (${p.layer})</td><td>${tjDigOf(p.C,p.n)}</td><td>${tjComb(p.C,p.n)?'yes':'no'}</td><td>${p.retro?'yes':'no'}</td><td class="mute" style="font-size:12px">${['Saturn'].includes(p.n)&&p.ring===3?'Stambha: misery is said to be greater if inimical or debilitated':'modifier only – it does not change the traditional result'}</td></tr>`).join('')}</table></div></div>`;
+}
+function kcTabIp(K){
+  const F=kcFindings(K),cats=[['prot','Protection and security'],['threat','Threats and opposition']],pend=['Health and vitality','Professional matters','Financial stability','Reputation','Litigation and disputes','Competition','Travel','Family matters','General annual developments'];
+  const lab=a=>{const p=a.filter(f=>f.eff==='+').length,n=a.filter(f=>f.eff==='-').length;return p&&n?'mixed':p?'supportive':n?'challenging':'no rule applies'};
+  return `<div class="card"><h3 style="margin-top:0">Interpretation</h3><p class="mute" style="margin:0 0 6px;font-size:12px">The known Kota Chakra rules concern the safety of the “fort” (the native or the matter in question). Only those categories can be addressed. For the other categories no rule could be found, so none is applied. ${KC_NOTE}</p></div>
+   ${cats.map(([k,t])=>{const a=F.filter(f=>f.cat===k);return `<div class="card"><h3 style="margin-top:0">${t} – <span style="color:${lab(a)==='supportive'?'var(--ok)':lab(a)==='challenging'?'var(--bad)':'var(--warn)'}">${lab(a)}</span></h3><table style="font-size:13px"><tr><th>What is activated</th><th>Nakshatra</th><th>Planet</th><th>Rule</th><th>Influence</th></tr>${a.map(f=>`<tr><td>${esc(f.text)}</td><td>${f.nak!=null?KC_NAK[f.nak][0]:'–'}</td><td>${esc(f.pl||'–')}</td><td>${f.id}</td><td>${f.eff==='+'?'supportive':f.eff==='-'?'challenging':'note'}</td></tr>`).join('')||'<tr><td colspan="5" class="mute">No rule applies.</td></tr>'}</table><p class="mute" style="margin:6px 0 0;font-size:12px">Exceptions that modify the result: retrograde planets (and always Rahu and Ketu) have their entry and exit paths reversed – ${F.filter(f=>f.id==='KC-E-001').length} applied. Dasha modification, cancellation and benefic counter-influence are described in the sources but have no usable formulation, so they are listed in the exception registry as RESEARCH PENDING.</p></div>`}).join('')}
+   <div class="card"><h3 style="margin-top:0">Other categories</h3><p class="mute" style="margin:0;font-size:13px">${pend.join(' · ')} – RESEARCH PENDING: no Kota Chakra rule for these could be verified.</p></div>`;
+}
+function kcTabMx(K){
+  const s=K.s,f=s.mf,Vd=kcVedha(K),rows=[];
+  for(let cnt=1;cnt<=28;cnt++){const idx=kcIdx(cnt,K.j),pos=KC_POS[cnt],pl=K.all.filter(p=>p.i===idx),vv=Vd.filter(v=>v.to===idx),b=pl.filter(p=>p.ben).length,m=pl.filter(p=>!p.ben).length;
+    rows.push({cnt,idx,pos,pl,vv,b,m,infl:b&&m?'mixed':b?'benefic':m?'malefic':'none'})}
+  let R=rows.filter(r=>(!f.pl||r.pl.some(p=>p.n===f.pl)||r.vv.some(v=>v.planet===f.pl))&&(f.ring===''||String(r.pos.ring)===String(f.ring))&&(!f.nat||r.infl===f.nat)&&(!f.q||KC_NAK[r.idx][0].toLowerCase().includes(f.q.toLowerCase())));
+  return `<div class="card"><h3 style="margin-top:0">Comparative Vedha matrix</h3><div class="row" style="gap:8px 12px"><label style="margin:0">Planet<br><select onchange="kcSetMf('pl',this.value)">${opt([['','All']].concat(PLANETS.map(p=>[p,p])),f.pl)}</select></label><label style="margin:0">Division<br><select onchange="kcSetMf('ring',this.value)">${opt([['','All']].concat(KC_RINGS.map((r,i)=>[String(i),r.name])),f.ring)}</select></label><label style="margin:0">Influence<br><select onchange="kcSetMf('nat',this.value)">${opt([['','All'],['benefic','Benefic'],['malefic','Malefic'],['mixed','Mixed'],['none','None']],f.nat)}</select></label><label style="margin:0">Search<br><input value="${esc(f.q)}" style="width:130px" onchange="kcSetMf('q',this.value)"></label><button class="sm" onclick="kcCsv()">Export table (CSV)</button><span class="mute">Layers shown: ${K.layers.join(' + ')} (change in Preferences)</span></div></div>
+   <div class="card"><div style="overflow-x:auto"><table style="font-size:12px"><tr><th>Count</th><th>Nakshatra</th><th>Division</th><th>Occupants</th>${PLANETS.map(p=>`<th>${AB[p]} Vedha</th>`).join('')}<th>Total Vedha</th><th>Final influence (occupants, traditional)</th><th>Research</th></tr>${R.map(r=>`<tr style="${r.idx===K.j?'background:var(--acc2);font-weight:700':''}"><td>${r.cnt}</td><td>${KC_NAK[r.idx][0]}</td><td>${KC_RINGS[r.pos.ring].name.split(' ')[0]} ${r.pos.slotName}</td><td>${r.pl.map(p=>p.n+(p.retro?'ʳ':'')).join(' ')||'–'}</td>${PLANETS.map(p=>`<td>${r.vv.some(v=>v.planet===p)?'●':''}</td>`).join('')}<td>${r.vv.length}</td><td style="color:${r.infl==='benefic'?s.colBen:r.infl==='malefic'?s.colMal:r.infl==='mixed'?s.colMix:s.colNone}">${r.infl}</td><td class="mute">${r.vv.length?'user rule: '+r.vv.length:'–'}</td></tr>`).join('')}</table></div><p class="mute" style="margin:6px 0 0;font-size:12px">“Final influence” is the occupant-based classification from the traditional description; the Vedha columns come only from the research rule you enter and are blank without one. The two are never merged.</p></div>`;
+}
+function kcCsv(){const K=kcCalc();if(!K)return;const Vd=kcVedha(K),rows=[['Count','Nakshatra','Division','Slot','Occupants','Total Vedha']];for(let c=1;c<=28;c++){const idx=kcIdx(c,K.j),pos=KC_POS[c];rows.push([c,KC_NAK[idx][0],KC_RINGS[pos.ring].name,pos.slotName,K.all.filter(p=>p.i===idx).map(p=>p.n).join(' '),Vd.filter(v=>v.to===idx).length])}dl('kota-chakra-matrix.csv',rows.map(r=>r.map(x=>'"'+String(x).replace(/"/g,'""')+'"').join(',')).join('\n'))}
+const KC_REG=[
+ ['KC-LY-001','Layout','28 nakshatras including Abhijit, counted from the Janma (reference) nakshatra; four nested squares with 8 + 8 + 8 + 4 positions','Ring lists from vijayalur.com; arrangement verified position by position against the supplied Jagannatha Hora screenshot','C','Verified against the screenshot (28 of 28 positions)'],
+ ['KC-LY-002','Ring membership by count','Bahya 1,7,8,14,15,21,22,28 · Praakaara 2,6,9,13,16,20,23,27 · Durgantara 3,5,10,12,17,19,24,26 · Stambha 4,11,18,25','Same','C','Verified against the screenshot'],
+ ['KC-LY-003','Slot order','Each ring is read clockwise from the top-left corner: TL, T, TR, R, BR, B, BL, L; the pillar T, R, B, L','From the screenshot (not stated in text)','C','Verified against the screenshot'],
+ ['KC-LY-004','Entry and exit paths','Corner positions = entry paths; side-middle positions = exit paths','vijayalur.com, theartofvedicastrology.com, astrocamp.com (text); compass naming (NE etc.) not fixed in sources','C','Applied to the screenshot layout'],
+ ['KC-LY-005','Agni Purana ch. 128 layout','Fixed compass positions of the nakshatras in three squares plus four pillars','wisdomlib translation (summary only); the summary is internally inconsistent','E','RESEARCH PENDING – not drawn'],
+ ['KC-NK-001','Nakshatra of a longitude','Index = FLOOR(longitude / 13°20′); pada = FLOOR(remainder / 3°20′) + 1','Standard','A/B','Implemented – verified by test'],
+ ['KC-NK-002','Abhijit segment','276°40′ – 280°53′20″ (last quarter of Uttarashadha and start of Shravana)','Commonly used boundaries; not verified for Jagannatha Hora','C','Implemented – selectable'],
+ ['KC-SW-001','Kota Swami','Lord of the reference Moon sign','vijayalur.com','C','Implemented (Jupiter in the screenshot example agrees)'],
+ ['KC-SW-002','Kota Pala','Lord of the pada / of the first letter of the name / of the nakshatra – sources differ','vijayalur.com, theartofvedicastrology.com','E','Lord of the nakshatra offered; the screenshot value (Saturn) not reproduced'],
+ ['KC-R-001..004','Core and outer occupancy','Benefics in the core strengthen, malefics weaken; in the outer rings malefics are adverse, benefics improving','vijayalur.com, astrocamp.com','C','Implemented'],
+ ['KC-R-005..008','Entry and exit patterns','Benefics entering with malefics leaving = winning; malefics entering with benefics leaving = Durga Bhanga Yoga','vijayalur.com, astrocamp.com, theartofvedicastrology.com','C','Implemented'],
+ ['KC-R-009..011','Stambha rules','Saturn, Rahu, Ketu in the pillar = misery; Jupiter, Venus = protection; all three malefics with no Jupiter in the interior or on an exit route = grave','theartofvedicastrology.com','C','Implemented'],
+ ['KC-R-012..015','Swami and Pala','Swami in Madhya or Pala in Bahya auspicious; Saturn worrying; Moon, Mercury, Venus do less harm','vijayalur.com','C','Implemented'],
+ ['KC-E-001','Retrograde and nodes','Retrograde planets reverse entry and exit; Rahu and Ketu are always retrograde','three sources agree','C','Implemented'],
+ ['KC-VD-001','Planetary Vedha matrix','Which nakshatra is struck by which planet','None found','E','RESEARCH PENDING – not loaded'],
+ ['KC-VD-D1','User-defined Vedha','Counts struck from the planet\'s own nakshatra','User','D','Implemented as a research tool']
+];
+const KC_EXC=[['KC-X-001','Retrograde reversal','Entry and exit swapped for a retrograde planet','C','Implemented'],['KC-X-002','Rahu and Ketu always reversed','Nodes treated as retrograde','C','Implemented'],['KC-X-003','Beginning of retrogression unfavourable','Stated in one source without a rule','E','RESEARCH PENDING'],['KC-X-004','Dasha modifies the result (e.g. Maraka dasha)','Stated without a formulation','E','RESEARCH PENDING'],['KC-X-005','Cancellation of Vedha / mutual Vedha','No Vedha rule exists to cancel','E','RESEARCH PENDING'],['KC-X-006','Multiple Vedha','Counted for the user-defined rule only','D','Implemented'],['KC-X-007','Benefic counter-influence / malefic reinforcement','Described only through the entry–exit patterns (KC-R-005, 006)','C','Partly implemented'],['KC-X-008','Boundary nakshatra (Abhijit)','Abhijit segment boundaries selectable','C','Implemented'],['KC-X-009','Dignity as a modifier','Shown as a secondary note; never changes the traditional result','C','Implemented']];
+function kcTabRs(K){
+  const s=K.s,tests=kcTests(),ok=tests.filter(x=>x.ok).length,profs=Object.keys(s.profiles||{});
+  return `<div class="card"><h3 style="margin-top:0">Calculation profiles</h3><div class="row" style="gap:8px 12px"><label style="margin:0">Profile name<br><input id="kcpn" value="${esc(s.prof)}" style="width:200px"></label><button class="sm" onclick="kcSaveProf()">Save current settings as profile</button><label style="margin:0">Load<br><select onchange="kcLoadProf(this.value)"><option value="">— choose —</option><option value="classical">Classical (Jagannatha Hora layout, modern rules)</option>${profs.map(p=>`<option value="${esc(p)}">${esc(p)}</option>`).join('')}</select></label></div><p class="mute" style="margin:6px 0 0;font-size:12px">A profile keeps the reference convention, layers, node treatment, planet selection, Swami/Pala choices, Abhijit convention, research Vedha rule and the colour scheme. The structural layout is the single verified layout.</p></div>
+   <div class="card"><h3 style="margin-top:0">Structural rule database – divisions and nakshatra positions</h3><div style="overflow-x:auto"><table style="font-size:12px"><tr><th>Division ID</th><th>Name</th><th>Slots (clockwise)</th><th>Counts from the reference</th><th>Nakshatras for the current reference</th></tr>${KC_RINGS.map((r,i)=>`<tr><td>KC-D${i+1}</td><td>${r.name}</td><td>${r.slots.join(' ')}</td><td>${r.counts.join(', ')}</td><td>${r.counts.map(c=>KC_NAK[kcIdx(c,K.j)][1]).join(' ')}</td></tr>`).join('')}</table></div><p class="mute" style="margin:6px 0 0;font-size:12px">This mapping is independent of the drawing: the diagram only renders it. Geometry: four concentric squares with half-widths in the ratio 1 : 0.78 : 0.56 : 0.33 as in the Jagannatha Hora diagram.</p></div>
+   <div class="card"><h3 style="margin-top:0">Rule registry (${KC_REG.length})</h3><div style="overflow-x:auto"><table style="font-size:12px"><tr><th>ID</th><th>Rule</th><th>Definition</th><th>Source</th><th>Class</th><th>Status</th></tr>${KC_REG.map(r=>`<tr><td>${r[0]}</td><td>${r[1]}</td><td>${esc(r[2])}</td><td>${esc(r[3])}</td><td>${r[4]}</td><td>${esc(r[5])}</td></tr>`).join('')}</table></div><p class="mute" style="margin:6px 0 0;font-size:12px">Classes: A classical documented · B school-specific · C research interpretation · D user-defined · E unverified. No classical chapter or verse for the modern four-ring scheme could be verified (the blog cites Brihat Parashara Hora Shastra, Daivajna Vallabha and Uttarakalamrita without references). Approval status of every rule: PENDING.</p></div>
+   <div class="card"><h3 style="margin-top:0">Exception registry</h3><table style="font-size:12px"><tr><th>ID</th><th>Exception</th><th>Definition</th><th>Class</th><th>Status</th></tr>${KC_EXC.map(r=>`<tr><td>${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td><td>${r[3]}</td><td>${r[4]}</td></tr>`).join('')}</table></div>
+   <div class="card"><h3 style="margin-top:0">Sources consulted</h3><ul style="margin:0 0 0 18px;font-size:13px"><li>vijayalur.com/2011/06/02/kota-chakra/ – ring lists, Swami and Pala, rules (blog)</li><li>theartofvedicastrology.com (page 389) – entry and exit paths, Stambha rules (blog)</li><li>astrocamp.com/kota-chakra-astrology.html – entry/exit and dasha remarks (blog)</li><li>wisdomlib.org Agni Purana chapter 128 – a different, classical layout (summary only, inconsistent)</li><li>Jagannatha Hora screenshot supplied by the Product Owner – used to confirm all 28 positions</li></ul><p class="mute" style="margin:6px 0 0;font-size:12px">Not found: the compass labelling of the diagram, a numeric Vedha matrix, any verse of the classical origin of the four-ring scheme, the contents of K.N. Rao's and K.K. Joshi's books.</p></div>
+   <div class="card"><h3 style="margin-top:0">Validation <span class="mute" style="font-weight:400;font-size:13px">(${ok} of ${tests.length} checks pass)</span></h3><div style="overflow-x:auto"><table style="font-size:12px"><tr><th>Check</th><th>Expected</th><th>Result</th><th></th></tr>${tests.map(x=>`<tr><td>${esc(x.n)}</td><td translate="no">${esc(String(x.exp))}</td><td translate="no">${esc(String(x.got))}</td><td>${x.ok?'<span class="ok">✓</span>':'<span class="bad">✗</span>'}</td></tr>`).join('')}</table></div><p class="mute" style="margin:6px 0 0;font-size:12px">The layout checks compare the engine with the screenshot supplied for Janma = Uttarashadha. The module has not been compared with Jagannatha Hora on planetary positions, and no such validation is claimed.</p></div>`;
+}
+function kcSaveProf(){const n=(document.getElementById('kcpn').value||'Custom').trim(),s=kcCfg(),o=JSON.parse(JSON.stringify(s));delete o.profiles;s.profiles=Object.assign({},s.profiles);s.profiles[n]=o;s.prof=n;kcSave();render()}
+function kcLoadProf(n){if(!n)return;const s=kcCfg();if(n==='classical'){const d=JSON.parse(JSON.stringify(KC_DEF)),keep=s.profiles;Object.assign(s,d,{profiles:keep,prof:'classical'})}else if(s.profiles[n]){const keep=s.profiles;Object.assign(s,JSON.parse(JSON.stringify(s.profiles[n])),{profiles:keep,prof:n})}kcSave();render()}
+function vKota(){
+  const c=curChart();if(!c)return NOCHART;const s=kcCfg();
+  let K;try{K=kcCalc(c,s)}catch(e){return `<div class="card"><b>Kota Chakra</b><p class="bad">The chakra could not be calculated: ${esc(e.message)}</p></div>`}
+  const tab=V.kct||'dg';
+  const head=`<div class="card" style="border-top:4px solid #c9a227"><h2 style="margin:0">AppstroSutras – Kota Chakra</h2><div class="mute">Fortress of Nakshatras · Swami <b>${K.swami||'–'}</b> · Pala <b>${K.pala||'–'}</b></div></div>`;
+  const tabs=`<div class="card noprint" style="padding:8px 14px"><div class="row">${KC_TABS.map(([k,l])=>`<button class="${tab===k?'on':''}" onclick="kcGo('${k}')">${l}</button>`).join('')}</div></div>`;
+  const body={dg:kcTabDg,pl:kcTabPl,vd:kcTabVd,st:kcTabSt,ip:kcTabIp,mx:kcTabMx,rs:kcTabRs}[tab](K);
+  return head+kcPanel(K)+tabs+body+`<div class="card" style="border-left:4px solid var(--warn);font-size:13px"><b>Rulebook status.</b> The layout is verified against the Jagannatha Hora screenshot you supplied. The rules of interpretation are modern descriptions from public pages; no classical text could be read, a numeric Vedha matrix does not exist in any source found, and the Kota Pala rule is not settled. Interpretations are indications only, not predictions.</div>`;
+}
+/* ============ TAJIK and KOTA CHAKRA – Hindi and Gujarati text (draft; awaiting the author's approval). Long explanatory notes stay in English. ============ */
+numAddTr([
+["Tajik","ताजिक","તાજિક"],["Kota Chakra","कोट चक्र","કોટ ચક્ર"],
+["AppstroSutras – Tajik","AppstroSutras – ताजिक","AppstroSutras – તાજિક"],["Annual horoscope and predictive engine","वार्षिक कुंडली और फलादेश इंजन","વાર્ષિક કુંડળી અને ફળાદેશ એન્જિન"],
+["Basic Parameters","मूल मापदंड","મૂળ પરિમાણો"],["Aspects","दृष्टियाँ","દૃષ્ટિઓ"],["Muntha","मुंथा","મુંથા"],["Argala","अर्गला","અર્ગલા"],["Sahams","सहम","સહમ"],["Varshaphal","वर्षफल","વર્ષફળ"],["Panchadhikari","पंचाधिकारी","પંચાધિકારી"],["Yogas","योग","યોગ"],["Dasha","दशा","દશા"],["Timing","समय-निर्धारण","સમય-નિર્ધારણ"],["Prediction Matrix","फलादेश आव्यूह","ફળાદેશ આવ્યૂહ"],["Comparison","तुलना","સરખામણી"],["Research & Audit","शोध और लेखा-परीक्षा","સંશોધન અને ઓડિટ"],
+["Master configuration","मुख्य विन्यास","મુખ્ય રૂપરેખા"],["Year of Varshaphal","वर्षफल का वर्ष","વર્ષફળનું વર્ષ"],["Zodiac","राशिचक्र","રાશિચક્ર"],["Sidereal","निरयन","નિરયન"],["Tropical","सायन","સાયન"],["Ayanamsha","अयनांश","અયનાંશ"],["House system","भाव पद्धति","ભાવ પદ્ધતિ"],["Annual return location","वार्षिक पुनरागमन स्थान","વાર્ષિક પુનરાગમન સ્થાન"],["Birth place","जन्म स्थान","જન્મ સ્થળ"],["Custom location","अपना स्थान","પોતાનું સ્થળ"],["Manual time correction (minutes)","हाथ से समय सुधार (मिनट)","હાથે સમય સુધારો (મિનિટ)"],["Reason (audit record)","कारण (लेखा अभिलेख)","કારણ (ઓડિટ નોંધ)"],["Aspect method","दृष्टि पद्धति","દૃષ્ટિ પદ્ધતિ"],["Faster planet","तेज़ ग्रह","ઝડપી ગ્રહ"],["Day / night","दिन / रात","દિવસ / રાત"],["Reset all preferences","सभी वरीयताएँ रीसेट करें","બધી પસંદગીઓ રીસેટ કરો"],["Save this analysis","यह विश्लेषण सहेजें","આ વિશ્લેષણ સાચવો"],["Download JSON","JSON डाउनलोड करें","JSON ડાઉનલોડ કરો"],
+["Planetary parameters","ग्रह मापदंड","ગ્રહ પરિમાણો"],["Natal","जन्म","જન્મ"],["Transit (now)","गोचर (अभी)","ગોચર (હમણાં)"],["Annual parameters","वार्षिक मापदंड","વાર્ષિક પરિમાણો"],["Solar return","सूर्य पुनरागमन","સૂર્ય પુનરાગમન"],["Planet","ग्रह","ગ્રહ"],["Longitude","देशांतर","રેખાંશ"],["Rashi","राशि","રાશિ"],["House","भाव","ભાવ"],["Motion","गति","ગતિ"],["Dignity","बल-स्थिति","ગૌરવ"],["Dispositor","राशि स्वामी","રાશિ સ્વામી"],["Direct","मार्गी","માર્ગી"],["Retrograde","वक्री","વક્રી"],
+["Tajik aspects","ताजिक दृष्टियाँ","તાજિક દૃષ્ટિઓ"],["Aspect matrix","दृष्टि आव्यूह","દૃષ્ટિ આવ્યૂહ"],["Applying","निकट आती","નજીક આવતી"],["Separating","दूर जाती","દૂર જતી"],["harmonious","अनुकूल","અનુકૂળ"],["challenging","चुनौतीपूर्ण","પડકારરૂપ"],["Conjunction","युति","યુતિ"],["Sextile","षष्ठांश (60°)","ષષ્ઠાંશ (60°)"],["Square","चतुर्थ (90°)","ચતુર્થ (90°)"],["Trine","त्रिकोण (120°)","ત્રિકોણ (120°)"],["Opposition","प्रतियुति (180°)","પ્રતિયુતિ (180°)"],
+["Muntha in each house","हर भाव में मुंथा","દરેક ભાવમાં મુંથા"],["Modifiers and weighted reading","संशोधक और भारित पठन","સંશોધકો અને ભારિત વાંચન"],["Completed age","पूर्ण आयु","પૂર્ણ ઉંમર"],["Natal Ascendant","जन्म लग्न","જન્મ લગ્ન"],
+["Sahams","सहम","સહમ"],["Purpose","उद्देश्य","હેતુ"],["Your own formula","आपका अपना सूत्र","તમારું પોતાનું સૂત્ર"],["Day formula","दिन का सूत्र","દિવસનું સૂત્ર"],["Night formula","रात का सूत्र","રાતનું સૂત્ર"],["Clear","साफ़ करें","સાફ કરો"],
+["Candidate list","उम्मीदवार सूची","ઉમેદવાર યાદી"],["Decision trace","निर्णय-क्रम","નિર્ણય-ક્રમ"],["Manual override","हाथ से बदलाव","હાથે ફેરફાર"],["eligible","पात्र","પાત્ર"],["rejected","अस्वीकृत","અસ્વીકૃત"],["Role","भूमिका","ભૂમિકા"],["Strength","बल","બળ"],["Eligibility","पात्रता","પાત્રતા"],
+["Tajik yogas","ताजिक योग","તાજિક યોગ"],["Ithasala","इत्थशाल","ઇત્થશાલ"],["Isarpha","ईसराफ","ઈસરાફ"],["Kamboola","कंबूल","કંબૂલ"],["Nakta","नक्त","નક્ત"],["Yamaya","यमया","યમયા"],["Radda","रद्द","રદ્દ"],
+["Varshaphal Dasha systems","वर्षफल दशा पद्धतियाँ","વર્ષફળ દશા પદ્ધતિઓ"],["Year length","वर्ष की लंबाई","વર્ષની લંબાઈ"],["Starting point","आरंभ बिंदु","પ્રારંભ બિંદુ"],["System","पद्धति","પદ્ધતિ"],["Antardasha","अंतर्दशा","અંતર્દશા"],["Start","आरंभ","શરૂ"],["End","अंत","અંત"],["Duration (days)","अवधि (दिन)","અવધિ (દિવસ)"],
+["Annual timing – twelve months of the Varsha year","वार्षिक समय-निर्धारण – वर्ष के बारह माह","વાર્ષિક સમય-નિર્ધારણ – વર્ષના બાર મહિના"],["Annual prediction matrix","वार्षिक फलादेश आव्यूह","વાર્ષિક ફળાદેશ આવ્યૂહ"],["Positive indicators:","सकारात्मक संकेत:","સકારાત્મક સંકેતો:"],["Negative indicators:","नकारात्मक संकेत:","નકારાત્મક સંકેતો:"],["Confidence:","विश्वास स्तर:","વિશ્વાસ સ્તર:"],["Timing window:","समय-खंड:","સમય-ખંડ"],["Natal promise","जन्म-वचन","જન્મ-વચન"],["Annual chart","वार्षिक कुंडली","વાર્ષિક કુંડળી"],["Saham","सहम","સહમ"],["Tajik aspects and yogas","ताजिक दृष्टि और योग","તાજિક દૃષ્ટિ અને યોગ"],["Dasha activation","दशा सक्रियता","દશા સક્રિયતા"],["Transit confirmation","गोचर पुष्टि","ગોચર પુષ્ટિ"],
+["Natal and Varshaphal","जन्म और वर्षफल","જન્મ અને વર્ષફળ"],["Overlay","आच्छादन","આચ્છાદન"],["Annual charts across years","वर्षों के वार्षिक चक्र","વર્ષોના વાર્ષિક ચક્રો"],["Research and calculation audit","शोध और गणना लेखा-परीक्षा","સંશોધન અને ગણતરી ઓડિટ"],["Rule registry","नियम-पंजी","નિયમ-નોંધણી"],["Validation","सत्यापन","ચકાસણી"],["Saved analyses","सहेजे विश्लेषण","સાચવેલા વિશ્લેષણો"],
+["Rulebook status.","नियम-पुस्तिका की स्थिति।","નિયમ-પુસ્તિકાની સ્થિતિ."],
+["Tajik traditions differ between schools; every disputed rule is a preference. Rules that could not be stated reliably are marked RESEARCH PENDING and are not applied. No rule has been verified against a primary text, and this module has not been compared with other software. All wording is draft interpretive text, not prediction.","ताजिक परंपराएँ संप्रदायों में भिन्न हैं; हर विवादित नियम एक वरीयता है। जिन नियमों को भरोसे से नहीं बताया जा सका उन्हें शोध लंबित चिह्नित किया गया है और लागू नहीं किया गया। किसी भी नियम को मूल ग्रंथ से सत्यापित नहीं किया गया है और इस मॉड्यूल की तुलना अन्य सॉफ़्टवेयर से नहीं की गई है। सारी शब्दावली प्रारूप व्याख्यात्मक पाठ है, भविष्यवाणी नहीं।","તાજિક પરંપરાઓ સંપ્રદાયો વચ્ચે ભિન્ન છે; દરેક વિવાદિત નિયમ એક પસંદગી છે. જે નિયમો ભરોસાપાત્ર રીતે કહી ન શકાયા તે સંશોધન બાકી તરીકે ચિહ્નિત છે અને લાગુ કરાયા નથી. કોઈ નિયમ મૂળ ગ્રંથ સામે ચકાસાયો નથી અને આ મોડ્યુલની સરખામણી અન્ય સૉફ્ટવેર સાથે કરાઈ નથી. બધી શબ્દાવલિ મુસદ્દારૂપ અર્થઘટનાત્મક લખાણ છે, આગાહી નહીં."],
+["Wording: draft text composed by rules from the chart data. Interpretive indications only – not predictions.","शब्दावली: कुंडली के आँकड़ों से नियमों द्वारा बना प्रारूप पाठ। केवल व्याख्यात्मक संकेत – भविष्यवाणी नहीं।","શબ્દાવલિ: કુંડળીના આંકડામાંથી નિયમો દ્વારા બનેલો મુસદ્દો. ફક્ત અર્થઘટનાત્મક સંકેતો – આગાહી નહીં."],
+/* ---- Kota Chakra ---- */
+["AppstroSutras – Kota Chakra","AppstroSutras – कोट चक्र","AppstroSutras – કોટ ચક્ર"],["Fortress of Nakshatras","नक्षत्रों का दुर्ग","નક્ષત્રોનો કિલ્લો"],["Kota Chakra – Fortress of Nakshatras","कोट चक्र – नक्षत्रों का दुर्ग","કોટ ચક્ર – નક્ષત્રોનો કિલ્લો"],
+["Nakshatra placement","नक्षत्र स्थिति","નક્ષત્ર સ્થિતિ"],["Planetary Vedha","ग्रह वेध","ગ્રહ વેધ"],["Strength & influence","बल और प्रभाव","બળ અને પ્રભાવ"],["Interpretation","व्याख्या","અર્થઘટન"],["Vedha matrix","वेध आव्यूह","વેધ આવ્યૂહ"],["Research & configuration","शोध और विन्यास","સંશોધન અને રૂપરેખા"],
+["Preferences","वरीयताएँ","પસંદગીઓ"],["Planets plotted","अंकित ग्रह","અંકિત ગ્રહો"],["Natal + transit (combined)","जन्म + गोचर (संयुक्त)","જન્મ + ગોચર (સંયુક્ત)"],["Reference nakshatra","संदर्भ नक्षत्र","સંદર્ભ નક્ષત્ર"],["Natal Moon nakshatra","जन्म चंद्र नक्षत्र","જન્મ ચંદ્ર નક્ષત્ર"],["Transit Moon nakshatra","गोचर चंद्र नक्षत्र","ગોચર ચંદ્ર નક્ષત્ર"],["Manually selected nakshatra","हाथ से चुना नक्षत्र","હાથે પસંદ કરેલું નક્ષત્ર"],["User-defined longitude","उपयोगकर्ता द्वारा परिभाषित देशांतर","વપરાશકર્તા-નિર્ધારિત રેખાંશ"],["Nodes","छाया ग्रह","છાયા ગ્રહો"],["Rahu and Ketu independently","राहु और केतु अलग-अलग","રાહુ અને કેતુ અલગ અલગ"],["Rahu only","केवल राहु","ફક્ત રાહુ"],["Ketu only","केवल केतु","ફક્ત કેતુ"],["Exclude nodes","छाया ग्रह छोड़ें","છાયા ગ્રહો બાકાત"],["Outer planets","बाहरी ग्रह","બાહ્ય ગ્રહો"],["Planet selection","ग्रह चयन","ગ્રહ પસંદગી"],["All plotted planets","सभी अंकित ग्रह","બધા અંકિત ગ્રહો"],["Benefics only","केवल शुभ ग्रह","ફક્ત શુભ ગ્રહો"],["Malefics only","केवल पाप ग्रह","ફક્ત પાપ ગ્રહો"],["Kota Swami (fort lord)","कोट स्वामी (दुर्ग-स्वामी)","કોટ સ્વામી (કિલ્લાના સ્વામી)"],["Kota Pala (fort guard)","कोट पाल (दुर्ग-रक्षक)","કોટ પાલ (કિલ્લાના રક્ષક)"],["Planet symbols","ग्रह चिह्न","ગ્રહ ચિહ્નો"],["Vedha lines","वेध रेखाएँ","વેધ રેખાઓ"],["Colours:","रंग:","રંગો:"],["Reset colours","रंग रीसेट करें","રંગ રીસેટ કરો"],
+["Zoom in","बड़ा करें","મોટું કરો"],["Zoom out","छोटा करें","નાનું કરો"],["Full screen","पूर्ण स्क्रीन","પૂર્ણ સ્ક્રીન"],["Export image","चित्र निर्यात","ચિત્ર નિકાસ"],["Print","प्रिंट","પ્રિન્ટ"],
+["Bahya (outer)","बाह्य (बाहरी)","બાહ્ય (બહારનું)"],["Praakaara (wall)","प्राकार (दीवार)","પ્રાકાર (દીવાલ)"],["Durgantara (interior)","दुर्गांतर (भीतरी)","દુર્ગાંતર (અંદરનું)"],["Stambha (pillar)","स्तंभ (खंभा)","સ્તંભ (થાંભલો)"],
+["Traditional Vedha result: not available.","पारंपरिक वेध परिणाम: उपलब्ध नहीं।","પરંપરાગત વેધ પરિણામ: ઉપલબ્ધ નથી."],["Strength and influence","बल और प्रभाव","બળ અને પ્રભાવ"],["Rule results","नियम परिणाम","નિયમ પરિણામો"],["supportive","सहायक","સહાયક"],["challenging","चुनौतीपूर्ण","પડકારરૂપ"],["mixed","मिश्रित","મિશ્ર"],["benefic","शुभ","શુભ"],["malefic","पाप","પાપ"],["Protection and security","सुरक्षा और संरक्षण","સુરક્ષા અને રક્ષણ"],["Threats and opposition","खतरे और विरोध","જોખમ અને વિરોધ"],["Other categories","अन्य श्रेणियाँ","અન્ય શ્રેણીઓ"],
+["Comparative Vedha matrix","तुलनात्मक वेध आव्यूह","તુલનાત્મક વેધ આવ્યૂહ"],["Export table (CSV)","तालिका निर्यात (CSV)","કોષ્ટક નિકાસ (CSV)"],["Calculation profiles","गणना प्रोफ़ाइल","ગણતરી પ્રોફાઇલ"],["Structural rule database – divisions and nakshatra positions","संरचनात्मक नियम-डेटाबेस – विभाग और नक्षत्र स्थान","માળખાકીય નિયમ-ડેટાબેઝ – વિભાગો અને નક્ષત્ર સ્થાન"],["Exception registry","अपवाद-पंजी","અપવાદ-નોંધણી"],["Sources consulted","देखे गए स्रोत","જોયેલા સ્ત્રોતો"],
+["Rules of interpretation come from modern published descriptions (blogs of the K.N. Rao / K.K. Joshi method); no classical verse could be read. Indications only – not predictions.","व्याख्या के नियम आधुनिक प्रकाशित विवरणों (के.एन. राव / के.के. जोशी पद्धति के ब्लॉग) से लिए गए हैं; कोई शास्त्रीय श्लोक पढ़ा नहीं जा सका। केवल संकेत – भविष्यवाणी नहीं।","અર્થઘટનના નિયમો આધુનિક પ્રકાશિત વર્ણનો (કે.એન. રાવ / કે.કે. જોશી પદ્ધતિના બ્લૉગ) માંથી લીધા છે; કોઈ શાસ્ત્રીય શ્લોક વાંચી શકાયો નથી. ફક્ત સંકેતો – આગાહી નહીં."],
+["Rulebook status.","नियम-पुस्तिका की स्थिति।","નિયમ-પુસ્તિકાની સ્થિતિ."]
+]);
 
 /* ============ KP – KRISHNAMURTI PADDHATI ============ */
 addTr([['KP','केपी','કેપી'],['Planets & Cusps','ग्रह और भाव-संधि','ગ્રહ અને ભાવ-સંધિ'],['Significators','कारक (सिग्निफिकेटर)','કારક (સિગ્નિફિકેટર)'],['Ruling Planets','शासक ग्रह (RP)','શાસક ગ્રહ (RP)'],['Event Analysis','घटना विश्लेषण','ઘટના વિશ્લેષણ'],['KP Chart','केपी कुंडली','કેપી કુંડળી'],['Star lord','नक्षत्र स्वामी','નક્ષત્ર સ્વામી'],['Sub lord','उप स्वामी (Sub)','ઉપ સ્વામી (Sub)'],['Sub-sub lord','उप-उप स्वामी','ઉપ-ઉપ સ્વામી'],['Cusp','भाव-संधि','ભાવ-સંધિ'],['Apply KP settings','केपी सेटिंग लागू करें','કેપી સેટિંગ લાગુ કરો'],['Day lord','वार स्वामी','વાર સ્વામી']]);
@@ -5504,9 +6391,9 @@ function vSens(){
   <div class="card"><div style="overflow-x:auto"><table><tr><th>Shift</th><th>Time</th><th>Lagna</th><th>D9 Lagna</th><th>D10 Lagna</th><th>Moon</th><th>Dasha at birth</th></tr>${rows.join('')}</table></div></div>`;
 }
 function vLab(){
-  const sub=V.lb||'work',subs=[['work','Workspace'],['panch','Panchanga'],['sens','Birth-time Sensitivity'],['milan','Ashtakoot Milan'],['sbc','Sarvatobhadra Chakra'],['dkoot','Dashakoot'],['num','Numerology'],['numt','Numerology Transit']];
+  const sub=V.lb||'work',subs=[['work','Workspace'],['panch','Panchanga'],['sens','Birth-time Sensitivity'],['milan','Ashtakoot Milan'],['sbc','Sarvatobhadra Chakra'],['dkoot','Dashakoot'],['num','Numerology'],['numt','Numerology Transit'],['kota','Kota Chakra']];
   const bar=`<div class="card" style="padding:8px 14px"><div class="row"><b style="color:var(--acc)">Astro Lab</b><span class="mute">›</span>${subs.map(([k,l])=>`<button class="${sub===k?'on':''}" onclick="V.lb='${k}';render()">${l}</button>`).join('')}</div></div>`;
-  return bar+(sub==='work'?vWork():sub==='panch'?vPanch():sub==='milan'?vMilan():sub==='sbc'?vSBC():sub==='dkoot'?vDash():sub==='num'?vNum():sub==='numt'?vNT():vSens());
+  return bar+(sub==='work'?vWork():sub==='panch'?vPanch():sub==='milan'?vMilan():sub==='sbc'?vSBC():sub==='dkoot'?vDash():sub==='num'?vNum():sub==='numt'?vNT():sub==='kota'?vKota():vSens());
 }
 /* ============ RESEARCH menu ============ */
 function vEvents(){
@@ -5533,6 +6420,7 @@ const HOME_TILES=[
  ['jaim','Jaimini','Jaimini Sutras (D1, D9 with arudhas, Chara Karakas 7/8, Chara and Kalachakra dasha), arudha calculation with options, karakas and Rashi Drishti.'],
  ['consult','Consultation','Select a chart, see D1 · D9 · Transit with dasha, planets and SAV, and log consultations (queries, observation / remedy) with auto IDs. Save, Print, PDF, Browser view.'],
  ['kp','KP','Krishnamurti Paddhati: Placidus cusps, KP chart and Chalit, star / sub / sub-sub lords with significations, ruling planets, dasha, transit, event analysis and KP Horary (1–249).'],
+ ['tajik','Tajik','Tajik annual horoscope (Varshaphal): solar return, Tajik aspects, Muntha, Argala, Sahams, Panchadhikari and Varshesha, Tajik yogas, Mudda and Yogini dashas, annual prediction matrix and audit.'],
  ['numer','Numerology','Five-stream numerology (Pythagorean, Chaldean, Vedic, Lo Shu / Vedic grid, Kabbalah) and the Personal Numerology Transit Analyser: personal and universal year, month, day, nine-year cycle, calendar, activity and compound numbers.'],
  ['horary','Horary','Natal D1, D9 and Transit-on-D1 side by side with 3-level dasha, Ashtakavarga, planetary tables, and an event-date locator with a Transit Now button.'],
  ['lab','Astro Lab','Workspace (charts, planet table, events) · Jaimini Arudha & Rashi Drishti · Panchanga · Birth-time Sensitivity.'],
@@ -5673,10 +6561,10 @@ function render(){
   if(V.view==='work'||V.view==='panch'){V.lb=V.view;V.view='lab'}
   if(V.view==='rules'||V.view==='backup'){V.rs=V.view;V.view='research'}
   if(V.view==='asht'||V.view==='shad'){V.st=V.view;V.view='strength'}
-  const tabs=[['home','Home'],['birth','Birth Details'],['charts3','Charts'],['strength','Strength'],['dasha','Dasha'],['jaim','Jaimini'],['transit','Transit'],['horary','Horary'],['kp','KP'],['numer','Numerology'],['consult','Consultation'],['lab','Astro Lab'],['research','Research'],['about','About Us']];
+  const tabs=[['home','Home'],['birth','Birth Details'],['charts3','Charts'],['strength','Strength'],['dasha','Dasha'],['jaim','Jaimini'],['transit','Transit'],['horary','Horary'],['kp','KP'],['tajik','Tajik'],['numer','Numerology'],['consult','Consultation'],['lab','Astro Lab'],['research','Research'],['about','About Us']];
   document.getElementById('nav').innerHTML=tabs.map(([k,l])=>`<button class="${V.view===k?'on':''}" onclick="go('${k}')">${l}</button>`).join('');
   const m=document.getElementById('main');
-  m.innerHTML=V.view==='home'?vHomeWrap():V.view==='birth'?vBirth():V.view==='charts3'?vCharts3():V.view==='strength'?vStrength():V.view==='dasha'?vDasha():V.view==='transit'?vTransit():V.view==='kp'?vKP():V.view==='numer'?vNumMain():V.view==='jaim'?vJaimini():V.view==='horary'?vHorary():V.view==='consult'?vConsult():V.view==='lab'?vLab():V.view==='research'?vResearch():V.view==='about'?vAbout():vHomeWrap();
+  m.innerHTML=V.view==='home'?vHomeWrap():V.view==='birth'?vBirth():V.view==='charts3'?vCharts3():V.view==='strength'?vStrength():V.view==='dasha'?vDasha():V.view==='transit'?vTransit():V.view==='kp'?vKP():V.view==='tajik'?vTajik():V.view==='numer'?vNumMain():V.view==='jaim'?vJaimini():V.view==='horary'?vHorary():V.view==='consult'?vConsult():V.view==='lab'?vLab():V.view==='research'?vResearch():V.view==='about'?vAbout():vHomeWrap();
   document.getElementById('disc').innerHTML=discInner()+' <a href="#" class="noprint" onclick="V.ab=\'disc\';go(\'about\');return false">Read full disclaimer</a>';
   if(V.view==='birth'&&V.bd==='new')initDefPlace();
   renderCtl(); applyLang();
