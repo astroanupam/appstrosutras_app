@@ -5030,7 +5030,7 @@ const TJ_DIGS={exalted:1,own:.9,friend:.7,neutral:.5,enemy:.3,debilitated:.1,'n/
 const TJ_DEF={year:0,zod:'sid',ay:'chart',node:'chart',hs:'whole',loc:'birth',lat:'',lon:'',tz:'',dst:0,adj:0,adjwhy:'',
  am:'sign',nodes:'n',uo:{},conj:'nature',cah:'#2e9d57',csh:'#3b82f6',cac:'#e8892b',csc:'#d64545',cno:'#9a9a9a',dn:'horizon',spd:'classical',
  mc:'completed',moff:0,mdeg:'lagna',mw:{exalted:2,own:1.5,debilitated:-2,combust:-1,retro:-.5,dusthana:-1,benefic:1,malefic:-1,vfriend:1,venemy:-1,kendra:1},
- sh30:'on',cusp:'equal',art:'ge',arRef:'alag',arSign:0,shSel:'punya',shUser:{},pf:'panch',dnr:'lum',vsOn:0,vsPl:'Jupiter',vsWhy:'',aonly:'n',
+ sh30:'on',cusp:'equal',padOrder:'mdlord',art:'ge',arRef:'alag',arSign:0,shSel:'punya',shUser:{},pf:'panch',dnr:'lum',vsOn:0,vsPl:'Jupiter',vsWhy:'',aonly:'n',
  ds:'mudda',yl:'actual',dstart:'moon',dsp:'Ketu',w:[20,20,10,15,10,10,10,5],mo:'equal',ykH:7,rdAll:'y'};
 const TJ_RULES_NOTE='Rules are classed A classical documented · B school-specific · C research interpretation · D user-defined · E unverified. No primary text has been checked; every rule below is at best B/C.';
 function tjCfg(){if(!V.tjS){const st=(S.ui&&S.ui.tj)||{},d=JSON.parse(JSON.stringify(TJ_DEF)),s=JSON.parse(JSON.stringify(st));V.tjS=Object.assign({},d,s);['uo','mw','shUser'].forEach(k=>V.tjS[k]=Object.assign({},d[k],s[k]||{}));if(!Array.isArray(V.tjS.w)||V.tjS.w.length!==8)V.tjS.w=d.w}return V.tjS}
@@ -5040,7 +5040,7 @@ function tjSetN(o,k,v){tjCfg()[o][k]=v;tjSave();render()}
 function tjSetW(i,v){tjCfg().w[i]=+v||0;tjSave();render()}
 function tjGo(t){V.tjt=t;render()}
 function tjReset(){V.tjS=JSON.parse(JSON.stringify(TJ_DEF));tjSave();render()}
-const tjFix=(x,d)=>x==null||isNaN(x)?'–':(+x).toFixed(d==null?2:d);
+const tjFix=(x,d)=>x==null||isNaN(x)?'–':((+x)+(x>=0?1e-9:-1e-9)).toFixed(d==null?2:d);
 const tjDMS=x=>{const d=Math.floor(x),m=Math.floor((x-d)*60),s=Math.round(((x-d)*60-m)*60);return d+'°'+String(m).padStart(2,'0')+"'"+String(s).padStart(2,'0')+'"'};
 const tjLon=x=>SIGNS[Math.floor(x/30)].slice(0,3)+' '+tjDMS(x%30);
 function tjFmt(ms,tz){const d=new Date(ms+tz*3600000);return d.toISOString().slice(0,10)+' '+d.toISOString().slice(11,19)}
@@ -5218,7 +5218,7 @@ function tjDasha(T){
     for(let i=0;i<8;i++){const g=YG[(idx+i)%8],len=lenOf(g[2]),ads=[];let s=start;for(let j=0;j<8;j++){const a=YG[(idx+i+j)%8],l=len*a[2]/tot;ads.push({lord:a[1],yogini:a[0],start:s,end:s+l});s+=l}out.push({lord:g[1],yogini:g[0],start:start,end:start+len,ads});start+=len}
     return {name:'Yogini (scaled to one year)',cls:'C',note:'Research interpretation: the 36-year Yogini cycle scaled to one Varsha year; start by the annual Moon nakshatra ((nakshatra number + 3) mod 8). Source not verified.',Y,list:out,start:ms0};
   }
-  return {name:'Patyayini',cls:'E',pending:true,note:'RESEARCH PENDING – no validated formula is loaded. Add one in the Dasha registry once the source is verified.',Y,list:[],start:ms0};
+  return tjPatyayini(T);
 }
 const tjDashaAt=(D,ms)=>{const md=D.list.find(m=>ms>=m.start&&ms<m.end);if(!md)return null;const ad=md.ads.find(a=>ms>=a.start&&ms<a.end);return {md,ad}};
 /* ---- prediction matrix ---- */
@@ -5235,8 +5235,8 @@ function tjPredict(T,cat){
   const sr=tjSaham(T,sh);if(sr&&sr.lon!=null){let s=tjStrength(A,sr.disp);if([1,4,5,7,9,10].includes(sr.house))s=Math.min(1,s+.1);if([6,8,12].includes(sr.house))s=Math.max(0,s-.1);res.push({s,t:sr.name+' Saham in house '+sr.house+', dispositor '+sr.disp+' ('+tjDigOf(A,sr.disp)+')'})}else res.push({s:null,t:(sr?sr.name+' Saham: formula pending':'no Saham')+' – layer not evaluated'});
   const lords=[...new Set(hs.map(h=>tjHL(A,h)).concat([kar]))].filter(n=>TJ7.includes(n)),ith=T.yg.ith.filter(y=>y.name==='Ithasala'&&(lords.includes(y.p.a)||lords.includes(y.p.b))),rad=ith.filter(y=>tjRadda(T,y.p.a,y.p.b).length),ch=T.asp.filter(p=>!p.none&&p.within&&p.nature==='challenging'&&(lords.includes(p.a)||lords.includes(p.b)));
   const ts=Math.max(0,Math.min(1,.5+.12*(ith.length-rad.length)-.08*ch.filter(p=>p.applying).length));res.push({s:ts,t:'Ithasala involving relevant lords: '+ith.length+' (with Radda conditions: '+rad.length+'); applying challenging aspects: '+ch.filter(p=>p.applying).length});
-  const now=T.dashaNow;if(now){const lordsAll=new Set(hs.map(h=>tjHL(A,h)).concat([kar])),occ=new Set(PLANETS.filter(n=>hs.includes(tjHouse(A,A.P[n].sign)))),hit=[now.md.lord,now.ad.lord].filter(l=>lordsAll.has(l)||occ.has(l));
-    const s=hit.length?Math.min(1,.5+.2*hit.length+.1*(tjStrength(A,now.md.lord)-.5)):.4;res.push({s,t:'Active Dasha '+now.md.lord+' / '+now.ad.lord+(hit.length?' – '+hit.join(', ')+' linked to the relevant houses or karaka':' – no direct link to the relevant houses')});if(hit.length)pos.push('The active Dasha lord is linked to '+name.toLowerCase())}else res.push({s:null,t:'Dasha not available for the reference date'});
+  const now=T.dashaNow;if(now){const lordsAll=new Set(hs.map(h=>tjHL(A,h)).concat([kar])),occ=new Set(PLANETS.filter(n=>hs.includes(tjHouse(A,A.P[n].sign)))),hit=[now.md.lord,now.ad.lord].map(l=>l==='Lagna'?LORD[A.lagna]:l).filter(l=>lordsAll.has(l)||occ.has(l));
+    const s=hit.length?Math.min(1,.5+.2*hit.length+.1*(tjStrength(A,now.md.lord==='Lagna'?LORD[A.lagna]:now.md.lord)-.5)):.4;res.push({s,t:'Active Dasha '+now.md.lord+' / '+now.ad.lord+(hit.length?' – '+hit.join(', ')+' linked to the relevant houses or karaka':' – no direct link to the relevant houses')});if(hit.length)pos.push('The active Dasha lord is linked to '+name.toLowerCase())}else res.push({s:null,t:'Dasha not available for the reference date'});
   res.push({s:null,t:'Transit confirmation is not evaluated in this version (RESEARCH PENDING: transit rules not loaded)'});
   const w=T.cfg.w,use=res.map((r,i)=>r.s==null?0:w[i]),tw=use.reduce((a,b)=>a+b,0),score=tw?res.reduce((a,r,i)=>a+(r.s==null?0:r.s*w[i]),0)/tw:null;
   res.forEach((r,i)=>{if(r.s!=null)(r.s>=.6?pos:r.s<=.4?neg:[]).push(TJ_LAYERS[i]+': '+r.t)});
@@ -5362,13 +5362,14 @@ const tjDt=(ms,T)=>tjDay(ms,T.tz+T.dst);
 function tjTabDa(T){
   const D=T.dasha,cfg=T.cfg,sel=V.tjDi,now=T.dashaNow;
   const reg=[['mudda','Mudda','C'],['yogini','Yogini (scaled)','C'],['pat','Patyayini','E – pending']];
-  return `<div class="card"><h3 style="margin-top:0">Varshaphal Dasha systems</h3><div class="row" style="gap:8px 12px"><label style="margin:0">System<br>${tjSel('ds',[['mudda','Mudda Dasha'],['yogini','Yogini (scaled to one year)'],['pat','Patyayini – RESEARCH PENDING']])}</label><label style="margin:0">Year length<br>${tjSel('yl',[['actual','Actual length of this Varsha year'],['360','360 days'],['365','365 days'],['365.25','365.25 days'],['365.2422','365.2422 days']],250)}</label><label style="margin:0">Starting point<br>${tjSel('dstart',[['moon','Annual-chart Moon nakshatra (with balance)'],['planet','Chosen planet, no balance']],280)}</label>${cfg.dstart==='planet'?`<label style="margin:0">Planet<br><select onchange="tjSet('dsp',this.value)">${opt(DORD.map(p=>[p,p]),cfg.dsp)}</select></label>`:''}</div>
-   <p class="mute" style="margin:6px 0 0;font-size:12px"><b>${D.name}</b> – class ${D.cls}. ${esc(D.note)} Month, day and date-precision conventions beyond the year length are not configurable yet. Dashas are kept in separate engines and must not be called classical Tajik without a verified source.</p></div>
+  return `<div class="card"><h3 style="margin-top:0">Varshaphal Dasha systems</h3><div class="row" style="gap:8px 12px"><label style="margin:0">System<br>${tjSel('ds',[['mudda','Mudda Dasha'],['yogini','Yogini (scaled to one year)'],['pat','Patyayani (Patyayini) – degrees of the planets and Lagna']])}</label>${cfg.ds==='pat'?`<label style="margin:0">Antardasha order<br>${tjSel('padOrder',[['mdlord','Starting from the Dasha lord, in ascending order'],['asc','Ascending order from the first-ranked body']],340)}</label>`:''}<label style="margin:0">Year length<br>${tjSel('yl',[['actual','Actual length of this Varsha year'],['360','360 days'],['365','365 days'],['365.25','365.25 days'],['365.2422','365.2422 days'],['365.256363','365.256363 days (sidereal year, as in Jagannatha Hora)']],250)}</label><label style="margin:0">Starting point<br>${tjSel('dstart',[['moon','Annual-chart Moon nakshatra (with balance)'],['planet','Chosen planet, no balance']],280)}</label>${cfg.dstart==='planet'?`<label style="margin:0">Planet<br><select onchange="tjSet('dsp',this.value)">${opt(DORD.map(p=>[p,p]),cfg.dsp)}</select></label>`:''}</div>
+   <p class="mute" style="margin:6px 0 0;font-size:12px"><b>${D.name}</b> – class ${D.cls}. ${esc(D.note)} Month, day and date-precision conventions beyond the year length are not configurable yet. Dashas are kept in separate engines and must not be called classical Tajik without a verified source.</p></div>${D.krish?tjPatTable(D):''}
    ${D.pending?'':`<div class="card"><div style="overflow-x:auto"><table style="font-size:13px"><tr><th>Dasha</th><th>Antardasha</th><th>Start</th><th>End</th><th>Duration (days)</th></tr>${D.list.map((m,i)=>`<tr style="cursor:pointer;background:var(--acc2);font-weight:700;${now&&now.md===m?'outline:2px solid #c9a227;':''}" onclick="V.tjDi=[${i},-1];render()"><td>${m.lord}${m.yogini?' ('+m.yogini+')':''}</td><td></td><td translate="no">${tjDt(m.start,T)}</td><td translate="no">${tjDt(m.end,T)}</td><td translate="no">${tjFix((m.end-m.start)/864e5,2)}</td></tr>`+m.ads.map((a,j)=>`<tr style="cursor:pointer;${now&&now.ad===a?'background:var(--acc2)':''}" onclick="V.tjDi=[${i},${j}];render()"><td></td><td>${a.lord}</td><td translate="no">${tjDt(a.start,T)}</td><td translate="no">${tjDt(a.end,T)}</td><td translate="no">${tjFix((a.end-a.start)/864e5,2)}</td></tr>`).join('')).join('')}</table></div><p class="mute" style="margin:6px 0 0;font-size:12px">Dates are calendar dates in the annual-chart time zone. The first period may begin before the return because the Moon is part-way through its nakshatra (the balance). Click a row to open its analysis.</p></div>
    ${sel&&D.list[sel[0]]?tjDashaAn(T,D,sel):''}`}`;
 }
 function tjDashaAn(T,D,sel){
   const m=D.list[sel[0]],a=sel[1]>=0?m.ads[sel[1]]:null,A=T.A,N=T.N,pl=(a||m).lord,vs=T.vsel.final,ml=T.muntha.lord;
+  if(pl==='Lagna'){const ll=LORD[A.lagna],occ=PLANETS.filter(n=>A.P[n].sign===A.lagna),asp=TJ7.filter(n=>A.P[n].sign!==A.lagna&&[2,3,4,6,8,9,10].includes(((A.P[n].sign-A.lagna)+12)%12));return `<div class="card"><h3 style="margin-top:0">Lagna period ${tjDt((a||m).start,T)} → ${tjDt((a||m).end,T)}</h3><p style="margin:0;font-size:13px">When the Varsha Lagna itself runs, it is judged through the Lagna lord <b>${ll}</b> (house ${tjHouse(A,A.P[ll].sign)}, ${tjDigOf(A,ll)}) and the planets placed in the 1st house (${occ.join(', ')||'none'}) or aspecting it by sign (${asp.join(', ')||'none'}). ${TJ_NOTE}</p></div>`}
   const sh=TJ_SH.map(s=>tjSaham(T,s.id)).filter(r=>r&&r.lon!=null&&r.disp===pl).map(r=>r.name);
   const yo=T.yg.ith.filter(x=>x.p.a===pl||x.p.b===pl).map(x=>x.name+' with '+(x.p.a===pl?x.p.b:x.p.a));
   const rel=(x,y)=>x===y?'the same planet':NATF[x]&&NATF[x].includes(y)?'a natural friend':(NATE[x]||[]).includes(y)?'a natural enemy':'neutral / not defined';
@@ -5438,7 +5439,7 @@ const TJ_REG=[
  ['TJ-YG-005','Manau, Gairi-Kamboola, Khallasara, Daghda-related','Formation rules not stated reliably','—','E','RESEARCH PENDING'],
  ['TJ-DA-001','Mudda Dasha','Vimshottari periods scaled so 120 years = one Varsha year; start by annual Moon nakshatra with balance','Year length selectable','C','Research interpretation – source not verified'],
  ['TJ-DA-002','Yogini (scaled)','36-year Yogini cycle scaled to one Varsha year; start (nakshatra number + 3) mod 8','Year length selectable','C','Research interpretation'],
- ['TJ-DA-003','Patyayini','No validated formula loaded','—','E','RESEARCH PENDING'],
+ ['TJ-DA-003','Patyayani (Patyayini) Dasha','Eight bodies (Sun, Moon, Mars, Mercury, Jupiter, Venus, Saturn, Varsha Lagna; no nodes) in ascending order of degrees within the sign; each period = (its degree − the previous degree) / highest degree × year length; Antardasha = MD × AD lord\'s own period / year','Supplied by the Product Owner (AI web summary citing astroshruti.ai, horoanalysis.wordpress.com, futurepointindia.com, shankerstudy.com)','B','Implemented; the supplied worked example is reproduced by a test; the method (order, eight bodies, no nodes, Patyamsha shares, 120-year total for a natal chart) agrees with Jagannatha Hora\'s Patyayini dasa for one chart (boundaries within about 3 days over 120 years); NOT verified against a primary text; Antardasha not compared'],
  ['TJ-PM-001','Prediction matrix','Eight layers with editable weights (20/20/10/15/10/10/10/5)','Layer scores 0–1 by transparent rules','D','Software defaults, not classical weights'],
  ['TJ-PM-002','Category houses and karakas','Common signification mapping per category','—','B','Editable in a later version'],
  ['TJ-TM-001','Monthly timing','Twelve equal parts of the Varsha year','Sun-ingress months not loaded','C','Implemented'],
@@ -5578,7 +5579,7 @@ function tjTabSa(T){
 function tjTests2(R,t,T){
   const sh=TJ_SH.filter(s=>s.def&&s.cat.indexOf('Variants')<0&&s.cat.indexOf('Matched')<0);
   t('The supplied list loads 35 Saham formulas','35',sh.length);
-  tjJhoraTest(R,t);
+  tjJhoraTest(R,t);tjPatTests(R,t,T);tjPatJhoraTest(R,t);
   const split=f=>f.match(/[+-]?[^+-]+/g),swap=f=>{const p=split(f);return p.length===3&&p[0][0]!=='-'&&p[1][0]==='-'?p[1].slice(1)+'-'+p[0]+'+'+p[2].replace(/^\+/,''):null};
   const bad=sh.filter(s=>s.def[0]!==s.def[1]&&swap(s.def[0])!==s.def[1]).map(s=>s.id);t('Night formula = day formula with A and B swapped for every non-invariant Saham (transcription check)','none',bad.join()||'none');
   t('Invariant (same) Sahams: Bhratri, Artha, Labha, Vanik, Paradesa, Mrityu','6',sh.filter(s=>s.def[0]===s.def[1]).length);
@@ -5601,12 +5602,51 @@ function tjJhoraCompare(cfgOver){
   return out;
 }
 function tjJhoraTest(R,t){
-  const o=tjJhoraCompare(),ok=o.filter(x=>x.diff!=null&&Math.abs(x.diff)<=150),mx=Math.max(...o.map(x=>x.diff==null?1e9:Math.abs(x.diff)));
-  t('Compared with the Jagannatha Hora Sahama list (14 Nov 2026, 12:56, South Grafton, day chart): '+o.length+' Sahams within 2.5 arc-minutes','all '+o.length,ok.length+' of '+o.length+' (largest difference '+tjFix(mx,0)+'″)',ok.length===o.length);
+  const o=tjJhoraCompare(),ok=o.filter(x=>x.diff!=null&&Math.abs(x.diff)<=60),mx=Math.max(...o.map(x=>x.diff==null?1e9:Math.abs(x.diff)));
+  t('Compared with the Jagannatha Hora Sahama list (14 Nov 2026, 12:56, South Grafton, day chart): '+o.length+' Sahams within 1 arc-minute (after the Lahiri calibration)','all '+o.length,ok.length+' of '+o.length+' (largest difference '+tjFix(mx,0)+'″)',ok.length===o.length);
   const o2=tjJhoraCompare({sh30:'off'}),bad2=o2.filter(x=>x.diff==null||Math.abs(x.diff)>150).length;
   t('Without the 30° rule many Sahams would differ from Jagannatha Hora by 30° (shows the rule matters)','> 10',bad2,bad2>10);
   const o3=tjJhoraCompare({cusp:'whole'}),b3=o3.filter(x=>['artha','labha','mrityu','paradesha','apamritu','santapa'].includes(x.id)&&Math.abs(x.diff)>150).length;
   t('With whole-sign cusps the cusp-based Sahams (Artha, Labha, Mrityu, Paradesa, Apamritu, Santapa) would not match Jagannatha Hora','> 3',b3,b3>3);
+}
+/* ---- Patyayani (Patyayini) Dasha: 8 bodies (7 planets + Varsha Lagna), ascending degrees within the sign ---- */
+function tjPatRank(items,Y){
+  const s=items.map((x,i)=>Object.assign({idx:i},x)).sort((a,b)=>a.k-b.k||a.idx-b.idx),mx=s.length?s[s.length-1].k:0;let prev=0;
+  s.forEach(x=>{x.pat=x.k-prev;prev=x.k;x.days=mx>0?x.pat/mx*Y:0});
+  return {rows:s,max:mx};
+}
+function tjPatyayini(T){
+  const C=T.A,cfg=T.cfg,Y=cfg.yl==='actual'?T.yearDays:+cfg.yl,DAY=864e5,items=TJ7.map(n=>({n,k:C.P[n].deg})).concat([{n:'Lagna',k:C.ascLon%30}]),R=tjPatRank(items,Y);
+  let t=T.adjMs;const list=[];
+  R.rows.forEach((x,i)=>{const len=x.days*DAY,s=t,order=cfg.padOrder==='mdlord'?R.rows.slice(i).concat(R.rows.slice(0,i)):R.rows;let u=s;const ads=order.map(a=>{const l=len*a.days/Y,o={lord:a.n,start:u,end:u+l};u+=l;return o});list.push({lord:x.n,start:s,end:s+len,ads});t+=len});
+  return {name:'Patyayani (Patyayini)',cls:'B',note:'Implemented from the method supplied by the Product Owner (AI web summary citing astroshruti.ai, horoanalysis.wordpress.com, futurepointindia.com, shankerstudy.com): the seven planets and the Varsha Lagna, ordered by degree within their signs; each period = (degree − previous degree) / highest degree × year length; nodes excluded. Not verified against a primary text or software.',Y,list,start:T.adjMs,krish:R.rows,max:R.max};
+}
+function tjPatTable(D){
+  return `<div class="card"><h3 style="margin-top:0">Patyayani – degrees and periods</h3><div style="overflow-x:auto"><table style="font-size:13px"><tr><th>Rank</th><th>Body</th><th>Krishamsha (degree in sign)</th><th>Patyamsha</th><th>Mahadasha (days)</th></tr>${D.krish.map((x,i)=>`<tr><td>${i+1}</td><td><b>${x.n}</b></td><td translate="no">${tjDMS(x.k)}</td><td translate="no">${tjFix(x.pat,4)}° = ${tjFix(x.k,4)} − ${tjFix(x.k-x.pat,4)}</td><td translate="no">${tjFix(x.days,2)}</td></tr>`).join('')}<tr><td></td><td><b>Total</b></td><td translate="no">highest = ${tjFix(D.max,4)}°</td><td translate="no">${tjFix(D.krish.reduce((a,x)=>a+x.pat,0),4)}°</td><td translate="no"><b>${tjFix(D.krish.reduce((a,x)=>a+x.days,0),2)}</b> (year length ${tjFix(D.Y,4)})</td></tr></table></div><p class="mute" style="margin:6px 0 0;font-size:12px">Mahadasha = Patyamsha / highest Krishamsha × year length. Antardasha = Mahadasha × the Antardasha lord's own Mahadasha / year length, so each Mahadasha is divided among all eight bodies. Rahu and Ketu are not used. Equal degrees give a zero-length period.</p></div>`;
+}
+function tjPatTests(R,t,T){
+  const ex=[['Moon',2],['Sun',5.5],['Lagna',9],['Jupiter',12.5],['Venus',16],['Mercury',19],['Mars',21.5],['Saturn',25]].map(([n,k])=>({n,k})),r=tjPatRank(ex.slice().reverse(),365.25);
+  t('Patyayani worked example (supplied): order by ascending degree','Moon,Sun,Lagna,Jupiter,Venus,Mercury,Mars,Saturn',r.rows.map(x=>x.n).join());
+  t('Patyayani example: Patyamsha values 2, 3.5, 3.5, 3.5, 3.5, 3, 2.5, 3.5','2,3.5,3.5,3.5,3.5,3,2.5,3.5',r.rows.map(x=>x.pat).join());
+  t('Patyayani example: durations in days (29.22, 51.14 ×4, 43.83, 36.53, 51.14)','29.22,51.14,51.14,51.14,51.14,43.83,36.53,51.14',r.rows.map(x=>tjFix(x.days,2)).join());
+  t('Patyayani example: durations add up to 365.25 days','365.25',tjFix(r.rows.reduce((a,x)=>a+x.days,0),2));
+  t('Sum of the Patyamshas equals the highest degree (25°)','25',r.rows.reduce((a,x)=>a+x.pat,0));
+  const T2=Object.assign({},T,{cfg:Object.assign({},T.cfg,{ds:'pat'})}),D=tjPatyayini(T2),tot=D.list.reduce((a,m)=>a+(m.end-m.start),0)/864e5;
+  t('Patyayani for a chart: the eight Mahadashas add up to the year length','equal',tjFix(tot,3)+' vs '+tjFix(T.yearDays,3),Math.abs(tot-T.yearDays)<1e-6);
+  t('Patyayani: the Antardashas of every Mahadasha add up to that Mahadasha','true',D.list.every(m=>Math.abs(m.ads.reduce((a,x)=>a+(x.end-x.start),0)-(m.end-m.start))<1e-3));
+  t('Patyayani uses exactly eight bodies and no nodes','8, no nodes',D.krish.length+(D.krish.some(x=>x.n==='Rahu'||x.n==='Ketu')?', nodes':', no nodes'));
+  const D2=tjPatyayini(Object.assign({},T2,{cfg:Object.assign({},T2.cfg,{padOrder:'mdlord'})}));t('Antardasha order from the Mahadasha lord starts with that lord','true',D2.list.every(m=>m.ads[0].lord===m.lord));
+  const ties=tjPatRank([{n:'A',k:5},{n:'B',k:5},{n:'C',k:10}],100);t('Equal degrees give a zero-length period for the second body (stable order)','50,0,50',ties.rows.map(x=>tjFix(x.days,0)).join());
+}
+function tjPatJhoraTest(R,t){
+  const d=(a,b,c)=>a+b/60+c/3600,kv=d(28,39,20.22),P=s=>{const m=/(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)/.exec(s);return Date.UTC(+m[1],+m[2]-1,+m[3],+m[4],+m[5],+m[6])};
+  const items=[['Venus',kv],['Moon',d(28,10,17.13)],['Sun',d(28,9,47.63)],['Saturn',d(14,19,3.60)],['Mercury',d(10,55,23.49)],['Lagna',d(3,22,2.75)],['Jupiter',d(1,32,40.73)],['Mars',d(0,59,31.41)]].map(([n,k])=>({n,k}));
+  const J=[['Mars','2031-01-08 07:34:03'],['Jupiter','2033-04-30 23:00:10'],['Lagna','2040-12-20 05:48:31'],['Mercury','2072-08-11 23:37:16'],['Saturn','2086-10-30 16:22:33'],['Sun','2144-10-24 12:23:41'],['Moon','2144-11-05 21:16:07'],['Venus','2146-11-16 07:14:40']];
+  const r=tjPatRank(items,120*365.256363004);let tt=P('2026-11-14 12:56:06');const diffs=r.rows.map(x=>{tt+=x.days*864e5;const j=J.find(y=>y[0]===x.n);return (tt-P(j[1]))/1000});
+  t('Jagannatha Hora Patyayini dasa for the reference chart (screenshot): order Mars, Jupiter, Asc, Mercury, Saturn, Sun, Moon, Venus','Mars,Jupiter,Lagna,Mercury,Saturn,Sun,Moon,Venus',r.rows.map(x=>x.n).join());
+  const mx=Math.max(...diffs.map(Math.abs))/86400;
+  t('Same chart: the eight period boundaries over the 120-year cycle agree within 4 days (largest '+tjFix(mx,2)+' days; the degrees on screen are rounded and the remaining difference in positions is below about 12″)','within 4 days',tjFix(mx,2)+' days',mx<=4);
+  t('Same chart: the end of the cycle (Venus) agrees within 5 minutes – the total is exactly 120 sidereal years of 365.256363 days','within 300 s',tjFix(Math.abs(diffs[7]),0)+' s',Math.abs(diffs[7])<=300);
 }
 /* ============ KOTA CHAKRA – FORTRESS OF NAKSHATRAS (Astro Lab › Kota Chakra) ============
    Layout: 28 nakshatras (with Abhijit) counted from the reference (Janma) nakshatra, four nested squares. The ring lists were taken from a
@@ -5905,6 +5945,12 @@ numAddTr([
 ["Rules of interpretation come from modern published descriptions (blogs of the K.N. Rao / K.K. Joshi method); no classical verse could be read. Indications only – not predictions.","व्याख्या के नियम आधुनिक प्रकाशित विवरणों (के.एन. राव / के.के. जोशी पद्धति के ब्लॉग) से लिए गए हैं; कोई शास्त्रीय श्लोक पढ़ा नहीं जा सका। केवल संकेत – भविष्यवाणी नहीं।","અર્થઘટનના નિયમો આધુનિક પ્રકાશિત વર્ણનો (કે.એન. રાવ / કે.કે. જોશી પદ્ધતિના બ્લૉગ) માંથી લીધા છે; કોઈ શાસ્ત્રીય શ્લોક વાંચી શકાયો નથી. ફક્ત સંકેતો – આગાહી નહીં."],
 ["Rulebook status.","नियम-पुस्तिका की स्थिति।","નિયમ-પુસ્તિકાની સ્થિતિ."]
 ]);
+/* ============ Lahiri ayanamsha calibration ============
+   Measured on one chart (14 Nov 2026, 12:56:06, South Grafton, Lahiri, mean node): every sidereal longitude of this application was
+   smaller than the Jagannatha Hora value by 36–57 arc-seconds (mean 44.2″; Lagna 47.5″, Sun 56.6″, Moon 39.5″, Rahu 43.1″).
+   The mean is applied to the Lahiri base value. It is a constant fitted at ONE date: the drift with time has not been measured. */
+const AYAN_CAL={lahiri:-44.2/3600};
+(function(){const a=AYAN.find(x=>x.k==='lahiri');if(a&&!a.cal){a.j=+(a.j+AYAN_CAL.lahiri).toFixed(6);a.cal=true;a.name='Lahiri (Chitrapaksha) – tuned to Jagannatha Hora (one date)'}})();
 
 /* ============ KP – KRISHNAMURTI PADDHATI ============ */
 addTr([['KP','केपी','કેપી'],['Planets & Cusps','ग्रह और भाव-संधि','ગ્રહ અને ભાવ-સંધિ'],['Significators','कारक (सिग्निफिकेटर)','કારક (સિગ્નિફિકેટર)'],['Ruling Planets','शासक ग्रह (RP)','શાસક ગ્રહ (RP)'],['Event Analysis','घटना विश्लेषण','ઘટના વિશ્લેષણ'],['KP Chart','केपी कुंडली','કેપી કુંડળી'],['Star lord','नक्षत्र स्वामी','નક્ષત્ર સ્વામી'],['Sub lord','उप स्वामी (Sub)','ઉપ સ્વામી (Sub)'],['Sub-sub lord','उप-उप स्वामी','ઉપ-ઉપ સ્વામી'],['Cusp','भाव-संधि','ભાવ-સંધિ'],['Apply KP settings','केपी सेटिंग लागू करें','કેપી સેટિંગ લાગુ કરો'],['Day lord','वार स्वामी','વાર સ્વામી']]);
