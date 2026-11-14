@@ -5921,7 +5921,7 @@ function vKota(){
   const head=`<div class="card" style="border-top:4px solid #c9a227"><h2 style="margin:0">AppstroSutras – Kota Chakra</h2><div class="mute">Fortress of Nakshatras · Swami <b>${K.swami||'–'}</b> · Pala <b>${K.pala||'–'}</b></div></div>`;
   const tabs=`<div class="card noprint" style="padding:8px 14px"><div class="row">${KC_TABS.map(([k,l])=>`<button class="${tab===k?'on':''}" onclick="kcGo('${k}')">${l}</button>`).join('')}</div></div>`;
   const body={dg:kcTabDg,pl:kcTabPl,vd:kcTabVd,st:kcTabSt,ip:kcTabIp,mx:kcTabMx,rs:kcTabRs}[tab](K);
-  return head+kcPanel(K)+tabs+body+`<div class="card" style="border-left:4px solid var(--warn);font-size:13px"><b>Rulebook status.</b> The layout is verified against the Jagannatha Hora screenshot you supplied. The rules of interpretation are modern descriptions from public pages; no classical text could be read, a numeric Vedha matrix does not exist in any source found, and the Kota Pala rule is not settled. Interpretations are indications only, not predictions.</div>`;
+  return head+kcPanel(K)+tabs+body;
 }
 /* ============ SURYA KALANALA (Astro Lab › Surya Kalanala) ============
    Layout: 28 nakshatras (with Abhijit) on the end-points of a figure of three vertical and three horizontal lines with diagonal lines, read
@@ -6076,7 +6076,7 @@ function vSurya(){
   const head=`<div class="card" style="border-top:4px solid #c9a227"><h2 style="margin:0">AppstroSutras – Surya Kalanala</h2><div class="mute">Sun-based chakra of conflict, health and security · position <b>${K.pos}</b> – ${esc(K.cat[1].split(':')[0])}</div></div>`;
   const tabs=`<div class="card noprint" style="padding:8px 14px"><div class="row">${SK_TABS.map(([k,l])=>`<button class="${tab===k?'on':''}" onclick="skGo('${k}')">${l}</button>`).join('')}</div></div>`;
   const body={ch:skTabCh,ve:skTabVe,tb:skTabTb,rs:skTabRs}[tab](K);
-  return head+skPanel(K)+tabs+body+`<div class="card" style="border-left:4px solid var(--warn);font-size:13px"><b>Rulebook status.</b> The figure is read from the Jagannatha Hora screenshot you supplied. The rules of reading are the text you supplied (an AI-generated summary citing <i>Jataka Bharanam</i>); no primary text was consulted, the meaning of “the same line” is not defined in it, and interpretations are indications only, not predictions.</div>`;
+  return head+skPanel(K)+tabs+body;
 }
 /* ============ CHANDRA KALANALA, KALACHAKRA, SHOOLA, TRIPATAKI (Astro Lab) ============
    Figures: read by eye from the user-supplied Jagannatha Hora screenshots (checked for internal consistency only).
@@ -6096,7 +6096,7 @@ function cxRegCard(reg,tests,extra){const ok=tests.filter(x=>x.ok).length;
   return `<div class="card"><h3 style="margin-top:0">Rule registry (${reg.length})</h3><div style="overflow-x:auto"><table style="font-size:12px"><tr><th>ID</th><th>Rule</th><th>Definition</th><th>Source</th><th>Class</th><th>Status</th></tr>${reg.map(r=>`<tr><td>${r[0]}</td><td>${r[1]}</td><td>${esc(r[2])}</td><td>${esc(r[3])}</td><td>${r[4]}</td><td>${esc(r[5])}</td></tr>`).join('')}</table></div><p class="mute" style="margin:6px 0 0;font-size:12px">Classes: A classical documented · B school-specific/supplied · C research interpretation · D user-defined · E unverified. No classical chapter or verse was checked. Approval status of every rule: PENDING.</p></div>
   <div class="card"><h3 style="margin-top:0">Validation <span class="mute" style="font-weight:400;font-size:13px">(${ok} of ${tests.length} checks pass)</span></h3><div style="overflow-x:auto"><table style="font-size:12px"><tr><th>Check</th><th>Expected</th><th>Result</th><th></th></tr>${tests.map(x=>`<tr><td>${esc(x.n)}</td><td translate="no">${esc(String(x.exp))}</td><td translate="no">${esc(String(x.got))}</td><td>${x.ok?'<span class="ok">✓</span>':'<span class="bad">✗</span>'}</td></tr>`).join('')}</table></div><p class="mute" style="margin:6px 0 0;font-size:12px">${extra||''}</p></div>`}
 const cxT=R=>(n,exp,got,ok)=>R.push({n,exp,got,ok:ok===undefined?String(exp)===String(got):ok});
-const cxStatus='<div class="card" style="border-left:4px solid var(--warn);font-size:13px"><b>Rulebook status.</b> The figure is read from the Jagannatha Hora screenshot you supplied. The rules of reading are the text you supplied (an AI-generated summary); no primary text was consulted, anything the supplied text does not define is shown as RESEARCH PENDING, and interpretations are indications only, not predictions.</div>';
+const cxStatus='';
 const cxWd=ms=>new Date(ms).getUTCDay();
 const CX_WD=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
 /* directions to avoid by weekday: as supplied for Disha Shoola (Shoola prompt) and the Kalachakra prompt */
