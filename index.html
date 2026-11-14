@@ -2965,6 +2965,7 @@ function mlDo(M){
     ['Boy',aB.join('<br>')||'None'],['Girl',aG.join('<br>')||'None'],
     ['Checked',['Saturn / Rahu / Ketu on the 7th','Venus affliction','Jupiter affliction','7th-house and 7th-lord affliction','Darakaraka affliction'].join(' · ')],
     ['Upapada Lagna (Jaimini)','<b>Boy:</b> '+mlUL(M.B,M.XB).line+'<br><b>Girl:</b> '+mlUL(M.G,M.XG).line+'<br><span class="mute">Upapada (A12) is taken from the Arudha routine used on the Jaimini page. Affliction is judged by malefics in or aspecting (rashi drishti) the UL, malefics in the 2nd from the UL, and the UL lord in a dusthana from the UL – a traditional Jaimini reading, not a classical Parashari rule; source verses not verified.</span>'],['Arishta-type marriage combinations','Vish Yoga and marriage-obstruction combinations appear under Strength › Yoga for each chart']],(aB.length||aG.length)?'warn':'ok');
+  M._mangal=mangal;M._other=other;
   return card('Nadi Dosha',M.nadi,'Nadi score 0/8','Same Nadi for both Moon nakshatras ('+K.NADI.boy+' / '+K.NADI.girl+'). It is a traditional classification; no medical, fertility or genetic claim is made.','Nadi')+card('Bhakoot Dosha',M.bhk,'Bhakoot score 0/7','Moon signs in a '+(K.BHAKOOT.bt||'2/12, 5/9 or 6/8')+' relationship ('+K.BHAKOOT.dgb+'/'+K.BHAKOOT.dbg+').','Bhakoot')
    +card('Gana mismatch',M.gmis,'Gana score '+K.GANA.pts+'/6','Gana of bride ('+K.GANA.girl+') and groom ('+K.GANA.boy+') score below 6.','Gana')+mangal+other
    +`<div class="card"><p class="mute" style="margin:0">Original scores and dosha records are shown exactly as calculated. Exceptions are listed with their source status and are never used to raise a Guna score. Most rules recorded here are traditional or regional readings cited by secondary sources and have not been checked against the primary texts.</p></div>`;
@@ -3337,6 +3338,603 @@ function sbcSelfTest(){
   t('Abhijit range 276°40′–280°53′20″ when included; absent when excluded',sbcNakOf(278,'in')==='ABH'&&sbcNakOf(278,'out')===20&&sbcNakOf(281,'in')===21&&sbcNakOf(276,'in')===20);
   t('Nakshatra of longitude 0–13°20′ is Ashwini; 359° is Revati',sbcNakOf(5,'in')===0&&sbcNakOf(359,'in')===26);
   const ok=res.filter(x=>x.ok).length;return {pass:ok,total:res.length,fail:res.filter(x=>!x.ok).map(x=>x.n)};
+}
+
+/* ============ DASHAKOOT MILAN (Astro Lab › Dashakoot) – South Indian ten Poruthams ============
+   Rules recorded as documented by the secondary sources consulted (hindutone.com, vedicbirth.com, hindu-blog.com, rasiandrise,
+   onlinejyotish.com). Counting convention used: bride's star is 1, counted forward to the groom's star. Vasya, the Kalaprakasika
+   paddhati, Rajju direction, Varnadi Panchaka and the sample sheet's own point rules are RESEARCH PENDING and disabled. */
+addTr([['Dashakoot','दशकूट','દશકૂટ'],['Agrees','शुभ','શુભ'],['Moderate','औसत','સરેરાશ'],['Does not agree','अशुभ','અશુભ'],['Dina','दिन','દિન'],['Gana','गण','ગણ'],['Mahendra','महेन्द्र','મહેન્દ્ર'],['Stree Deergha','स्त्रीदीर्घ','સ્ત્રીદીર્ઘ'],['Yoni','योनि','યોનિ'],['Rasi','राशि','રાશિ'],['Rasi Adhipati','राश्यधिपति','રાશ્યધિપતિ'],['Vashya','वश्य','વશ્ય'],['Rajju','रज्जु','રજ્જુ'],['Vedha','वेध','વેધ'],['Varnadi Panchaka','वर्णादि पंचक','વર્ણાદિ પંચક'],['Dashakoot Milan','दशकूट मिलान','દશકૂટ મિલન']]);
+const DK_PEND='RESEARCH PENDING';
+const DK_RAJJU_NAMES=['Pada (feet)','Kati (waist)','Nabhi (navel)','Kantha (neck)','Siro (head)'];
+const DK_RAJJU_OF=(()=>{const g=[[0,8,9,17,18,26],[1,7,10,16,19,25],[2,6,11,15,20,24],[3,5,12,14,21,23],[4,13,22]],o=[];g.forEach((a,k)=>a.forEach(n=>o[n]=k));return o})();
+const DK_VEDHA_PAIRS=[[0,17],[1,16],[2,15],[3,14],[5,21],[6,20],[7,19],[8,18],[9,26],[10,25],[11,24],[12,23],[4,13],[4,22],[13,22]];
+const dkVedha=(a,b)=>DK_VEDHA_PAIRS.some(p=>(p[0]===a&&p[1]===b)||(p[0]===b&&p[1]===a));
+const DK_MAH=[4,7,10,13,16,19,22,25];
+const DK_YONI_ENEMY=[[0,8],[1,13],[2,11],[3,12],[4,10],[5,6],[7,9]];
+const DK_DEF={prof:'south',pts:'none',area:'trad',sd:'13',yoni:'matrix',vas:'pending',min:'5',vp:'pending',ex:'',exfil:'all',exview:'lib',exnote:''};
+function dks(){if(!V.dk)V.dk=Object.assign({},DK_DEF,JSON.parse(JSON.stringify((S.ui&&S.ui.dk)||{})));return V.dk}
+function dkSet(k,v){const s=dks();s[k]=v;S.ui=S.ui||{};S.ui.dk=Object.assign({},s);save();render()}
+function dkReset(){V.dk=Object.assign({},DK_DEF);S.ui=S.ui||{};delete S.ui.dk;save();render()}
+const DK_KOOTAS=[
+ ['DINA','Dina','दिन','Dinam / Dina Porutham',3,'Long life and health of the marriage; daily harmony','Fortune (Bhagya)'],
+ ['GANA','Gana','गण','Ganam / Gana Porutham',6,'Matching of temperament and character','Wealth (Sampatti)'],
+ ['MAHENDRA','Mahendra','महेन्द्र','Mahendram',2,'Children, growth and welfare','Mutual love (Paraspar prem)'],
+ ['STREE','Stree Deergha','स्त्रीदीर्घ','Stree Deergham',2,'Finance and the bride\'s long-term prosperity','Generally auspicious result'],
+ ['YONI','Yoni','योनि','Yoni Porutham',4,'Marital and intimate harmony (symbolic animal natures)','Intimate relationship'],
+ ['RASI','Rasi','राशि','Rasi Porutham',7,'Peaceful family life and growth','Family progress (Parivarik unnati)'],
+ ['RASYA','Rasi Adhipati','राश्यधिपति','Rasyadhipati / Rasi Adhipathi',5,'Friendship of the Moon-sign lords; wealth of children','Wealth and grain (Dhan-dhanya)'],
+ ['VASYA','Vashya','वश्य','Vasya Porutham',2,'Mutual attraction and affection','Children (Santan)'],
+ ['RAJJU','Rajju','रज्जु','Rajju Porutham',8,'Longevity of the couple (considered critical)','Longevity of marriage (Vaivahik deerghata)'],
+ ['VEDHA','Vedha','वेध','Vedha / Vedhai Porutham',2,'Absence of mutual obstruction','Birth of sons (Putra prapti)']];
+const dkRes={agree:['Agrees','ok'],moderate:['Moderate','warn'],not:['Does not agree','bad'],pending:['RESEARCH PENDING','']};
+/* ============ DASHAKOOT – rule engine parameters (profiles) and the author's own rulebook ============
+   "Anoopam Shukla Rulebook": every table, count, threshold, point value and exception is entered by the author and stored
+   on this device (exportable as JSON). The engine applies exactly what the author enters; a section left blank is
+   shown as RESEARCH PENDING. Nothing in it is taken from a classical text unless the author records that source. */
+MKC.A=['Author-defined (Anoopam Shukla Rulebook)','A'];
+const DKRB_FORMAT='ASTROSUTRAS-DASHAKOOT-RULEBOOK-1';
+const DKRB_RES=[['','— not set —'],['agree','Agrees'],['moderate','Moderate'],['not','Does not agree']];
+const DKRB_REL=[['Same','Same lord'],['FF','Friend + Friend'],['FN','Friend + Neutral'],['NN','Neutral + Neutral'],['FE','Friend + Enemy'],['NE','Neutral + Enemy'],['EE','Enemy + Enemy']];
+const dkrb=()=>(S.ui&&S.ui.dkrb)||null;
+function dkrbSave(rb){S.ui=S.ui||{};S.ui.dkrb=rb;save()}
+function dkrbP(path,val,type){
+  const rb=dkrb();if(!rb)return;const a=path.split('.');let o=rb;
+  for(let i=0;i<a.length-1;i++){const k=a[i];if(o[k]===undefined||o[k]===null)o[k]=/^\d+$/.test(a[i+1])?[]:{};o=o[k]}
+  const last=a[a.length-1];let v=val;
+  if(type==='n')v=val===''?'':+val;
+  if(type==='l')v=String(val).split(/[,\s]+/).filter(x=>x!=='').map(Number).filter(x=>!isNaN(x));
+  o[last]=v;dkrbSave(rb);render();
+}
+function dkrbMat(r,c,val){const rb=dkrb();rb.rules.yoni.m[r][c]=val===''?'':+val;dkrbSave(rb);render()}
+function dkrbVas(r,c,val){const rb=dkrb();rb.rules.vasya[r][c]=val;dkrbSave(rb);render()}
+function dkrbExcDel(i){const rb=dkrb();rb.exc.splice(i,1);dkrbSave(rb);render()}
+function dkrbDelete(){if(!confirm('Delete the Anoopam Shukla rulebook from this device? Export it first if you want to keep it.'))return;const t=prompt('Type DELETE to confirm.');if(t!=='DELETE')return;if(S.ui)delete S.ui.dkrb;if(dks().prof==='anoopam'){dks().prof='south';S.ui.dk=Object.assign({},dks())}save();render()}
+function dkrbExport(){const rb=dkrb();if(!rb)return;dl('dashakoot-rulebook-anoopam-shukla-v'+rb.version+'.json',JSON.stringify(rb,null,1))}
+function dkrbImport(inp){const f=inp.files[0];if(!f)return;const rd=new FileReader();rd.onload=()=>{try{const o=JSON.parse(rd.result);if(o.format!==DKRB_FORMAT||!o.nak||!o.rules)throw 0;if(dkrb()&&!confirm('Replace the current rulebook with this file?'))return;dkrbSave(o);render()}catch(e){alert('This is not a valid AppstroSutras Dashakoot rulebook file.')}inp.value=''};rd.readAsText(f)}
+function dkrbParsePairs(txt){
+  const alias={moola:'Mula',mool:'Mula',dhanistha:'Dhanishta',shatabisha:'Shatabhisha',satabhisha:'Shatabhisha',sravana:'Shravana',aslesha:'Ashlesha',asvini:'Ashwini',aswini:'Ashwini',krtika:'Krittika',kritika:'Krittika'};
+  const idx=s=>{s=s.trim().toLowerCase().replace(/\s+/g,' ');if(alias[s])s=alias[s].toLowerCase();return NAKS.findIndex(n=>n.toLowerCase()===s)};
+  const pairs=[],bad=[];String(txt||'').split(/\n|;/).map(l=>l.trim()).filter(Boolean).forEach(l=>{const m=l.split(/\s*[-–—,]\s*/);if(m.length!==2){bad.push(l);return}const a=idx(m[0]),b=idx(m[1]);if(a<0||b<0||a===b){bad.push(l);return}pairs.push([a,b])});
+  return {pairs,bad};
+}
+/* ---- parameter sets ---- */
+function dkQcommon(P){
+  return {id:'south',label:'Common South Indian (secondary sources)',author:false,
+   ganaOf:n=>MK_GANA_OF[n],yoniOf:n=>MK_YONI_OF[n],rajjuOf:n=>DK_RAJJU_OF[n],
+   dina:(c,c2)=>{const rem=c%9;return {res:[2,4,6,8,0].includes(rem)?'agree':'not',txt:`Count from the bride's star (as 1) to the groom's = ${c}. ${c} ÷ 9 leaves ${rem}. Remainders 2, 4, 6, 8 or 0 are favourable. (For information: groom→bride count is ${c2}, remainder ${c2%9}. This one-direction rule is not the Ashtakoot Tara rule.)`}},
+   mah:c=>({res:DK_MAH.includes(c)?'agree':'not',txt:`Count from the bride's star to the groom's = ${c}. Agrees when the count is 4, 7, 10, 13, 16, 19, 22 or 25.`}),
+   stree:c=>{const t=P.sd,r=t==='8'?(c>=8?'agree':'not'):(c>13?'agree':(t==='9'&&c>9)?'moderate':'not');return {res:r,txt:`Count from the bride's star to the groom's = ${c}. Profile: ${t==='13'?'a count above 13 is a full match (most common)':t==='9'?'above 13 full, above 9 moderate (some astrologers)':'a count of 8 or more (one source), with an exemption if Rasi and Gana agree'}.`}},
+   gana:(gb,gg)=>{const same=gb===gg,dm=(gb==='D'&&gg==='M')||(gb==='M'&&gg==='D');return {res:same?'agree':dm?'moderate':'not',txt:`Same Gana is best; Deva with Manushya is acceptable; combinations with Rakshasa are treated with caution. This engine treats every Rakshasa mismatch as "does not agree" and lists softening rules under Exceptions.`}},
+   yoni:(yb,yg)=>{const ys=MK_YONI_M[yb[0]][yg[0]],enemy=DK_YONI_ENEMY.some(p=>(p[0]===yb[0]&&p[1]===yg[0])||(p[1]===yb[0]&&p[0]===yg[0]));const r=P.yoni==='enemy'?(enemy?'not':yb[0]===yg[0]?'agree':'moderate'):(ys>=3?'agree':ys===0?'not':'moderate');return {res:r,txt:`Same or friendly yonis agree; hostile pairs (cat–rat, snake–mongoose, cow–tiger and the other classical enemy pairs) do not. Classification used: ${P.yoni==='enemy'?'enemy pairs only – same yoni agrees, other pairs moderate':'the Ashtakoot yoni table, borrowed (value '+ys+'/4: 3–4 agree, 1–2 moderate, 0 enemy)'}.`}},
+   rasi:cs=>({res:cs===1?'agree':(cs===6||cs===8)?'not':cs===12?'moderate':cs>=7?'agree':'not',txt:`Count from the bride's Moon sign to the groom's = ${cs}. Favourable when the signs are the same or the count is beyond the 6th; 6/8 (count 6 or 8) is avoided; 2/12 is treated with caution (count 12 shown as moderate); counts 2–5 do not agree. Regional practice varies.`}),
+   rasya:(r1,r2,same)=>{const r=same||(r1==='Friend'&&r2==='Friend')||(r1==='Friend'&&r2==='Neutral')||(r1==='Neutral'&&r2==='Friend')?'agree':(r1==='Enemy'&&r2==='Enemy')?'not':'moderate';return {res:r,txt:'Same lord or friends agree; neutral is moderate; mutual enemies do not agree. One-sided enmity is not covered by the source – shown as moderate. Kept separate from Ashtakoot Graha Maitri.'}},
+   vasya:(sb,sg,M)=>{if(P.vas!=='borrowed')return null;const cb=mkVashya(sb,M.B.P.Moon.deg),cg=mkVashya(sg,M.G.P.Moon.deg),v=MK_VASHYA_M[cg][cb];return {res:v>=2?'agree':v>0?'moderate':'not',boy:MK_VASHYA_CLS[cb],girl:MK_VASHYA_CLS[cg],txt:`BORROWED from the Ashtakoot Vashya table (applicability to Dashakoot not verified): ${MK_VASHYA_CLS[cb]} (groom) / ${MK_VASHYA_CLS[cg]} (bride) = ${v}/2.`}},
+   rajju:(jb,jg)=>({res:jb===jg?'not':'agree',txt:`Both in the same rajju = Rajju Dosha; different rajjus agree. Ascending/descending direction is ${DK_PEND} and not used.`}),
+   vedha:(nb,ng)=>({res:dkVedha(nb,ng)?'not':'agree',txt:'Pairs: Ashwini–Jyeshtha, Bharani–Anuradha, Krittika–Vishakha, Rohini–Swati, Ardra–Shravana, Punarvasu–Uttara Ashadha, Pushya–Purva Ashadha, Ashlesha–Mula, Magha–Revati, Purva Phalguni–Uttara Bhadrapada, Uttara Phalguni–Purva Bhadrapada, Hasta–Shatabhisha, and Mrigashira/Chitra/Dhanishta with each other. Unrelated to Sarvatobhadra Chakra Vedha.'}),
+   pts:id=>{const k=DK_KOOTAS.find(x=>x[0]===id);return {max:k[4],mod:k[4]/2}}};
+}
+function dkQrb(rb){
+  const R=rb.rules||{},N=rb.nak||[],pend=(w)=>null,vp=dkrbParsePairs(R.vedha&&R.vedha.pairs);
+  const cn=(a,b)=>((b-a+27)%27)+1,okn=v=>v!==''&&v!==undefined&&v!==null&&!isNaN(v);
+  return {id:'anoopam',label:rb.name+' v'+rb.version,author:true,
+   ganaOf:n=>(N[n]&&N[n].gana)||'',yoniOf:n=>{const e=N[n]||{};return okn(e.yoni)&&e.yoni!==''?[+e.yoni,e.sex||'']:null},rajjuOf:n=>{const g=(N[n]||{}).rajju;return okn(g)&&g!==''?+g:null},
+   dina:(c,c2)=>{const d=R.dina;if(!d||!d.fav||!d.fav.length)return null;const x=d.dir==='gb'?c2:c,rem=x%(d.div||9);return {res:d.fav.includes(rem)?'agree':'not',txt:`Author's rule: count ${d.dir==='gb'?'groom→bride':'bride→groom'} = ${x}; ÷ ${d.div||9} leaves ${rem}; favourable remainders: ${d.fav.join(', ')}.`}},
+   mah:(c,c2)=>{const d=R.mah;if(!d||!d.counts||!d.counts.length)return null;const x=d.dir==='gb'?c2:c;return {res:d.counts.includes(x)?'agree':'not',txt:`Author's rule: count ${d.dir==='gb'?'groom→bride':'bride→groom'} = ${x}; favourable counts: ${d.counts.join(', ')}.`}},
+   stree:(c,c2)=>{const d=R.stree;if(!d||!okn(d.n)||d.n==='')return null;const x=d.dir==='gb'?c2:c,ge=(v,t,op)=>op==='>='?v>=t:v>t;let r=ge(x,+d.n,d.op)?'agree':(okn(d.modN)&&d.modN!==''&&ge(x,+d.modN,d.modOp))?'moderate':'not';return {res:r,txt:`Author's rule: count ${d.dir==='gb'?'groom→bride':'bride→groom'} = ${x}; full when ${d.op==='>='?'≥':'>'} ${d.n}${okn(d.modN)&&d.modN!==''?'; moderate when '+(d.modOp==='>='?'≥':'>')+' '+d.modN:''}.`}},
+   gana:(gb,gg)=>{const m=R.gana;if(!m||!gb||!gg)return null;const i={D:0,M:1,R:2},v=m[i[gg]]&&m[i[gg]][i[gb]];return v?{res:v,txt:`Author's Gana table: bride ${MK_GANA_NAME[gg]}, groom ${MK_GANA_NAME[gb]} → ${v}.`}:null},
+   yoni:(yb,yg)=>{const d=R.yoni;if(!d||!yb||!yg)return null;const v=d.m&&d.m[yb[0]]&&d.m[yb[0]][yg[0]];if(v===''||v===undefined||v===null)return null;return {res:v>=d.agree?'agree':v>=d.mod?'moderate':'not',txt:`Author's Yoni table value ${v} (agrees ≥ ${d.agree}, moderate ≥ ${d.mod}).`}},
+   rasi:cs=>{const d=R.rasi,v=d&&d[cs-1];return v?{res:v,txt:`Author's Rasi table: count ${cs} from the bride's sign to the groom's → ${v}.`}:null},
+   rasya:(r1,r2,same)=>{const d=R.rasya;if(!d)return null;const k=same?'Same':[r1,r2].map(x=>x==='Friend'?'F':x==='Neutral'?'N':'E').sort().join('');const key={FF:'FF',EF:'FE',FN:'FN',NN:'NN',EN:'NE',EE:'EE'}[k]||k,v=d[key];return v?{res:v,txt:`Author's Rasi-lord table: ${same?'same lord':r1+' / '+r2} → ${v}.`}:null},
+   vasya:(sb,sg)=>{const d=R.vasya,v=d&&d[sg]&&d[sg][sb];return v?{res:v==='✓'?'agree':v==='~'?'moderate':v==='✗'?'not':v,boy:SIGNS[sb],girl:SIGNS[sg],txt:`Author's Vasya table: bride ${SIGNS[sg]}, groom ${SIGNS[sb]} → ${v}.`}:null},
+   rajju:(jb,jg,nb,ng)=>{if(jb===null||jg===null)return null;const r=R.rajju||{},same=r.same||'not',sev=DKRB_RAJJU_SEV[jb]||'';
+     if(jb!==jg)return {res:'agree',txt:"Author's rule: different rajju groups agree."};
+     if(jb===4&&r.siro!==undefined)return {res:r.siro||'not',txt:`Both stars in the Siro (head) rajju – ${sev}; the gatekeeper is a hard rejection.`};
+     const da=(N[nb]||{}).dir,db=(N[ng]||{}).dir,hasDir=r.opp!==undefined&&(da==='A'||da==='V')&&(db==='A'||db==='V'),dn=d=>d==='A'?'Aroha (ascending)':'Avaroha (descending)';
+     if(hasDir){const opp=da!==db;if(opp&&r.exc!=='no')return {res:r.opp||'moderate',txt:`Same rajju (${sev}); groom's star is ${dn(da)} and bride's is ${dn(db)} → soft pass by the Apavada rule (dosha cancelled).`};
+       return {res:opp?same:(r.sameDir||same),txt:`Same rajju (${sev}); ${opp?'opposite directions, but the exception is switched off':'both stars are '+dn(da)+' – same direction'} → Rajju Dosha (hard rejection).`}}
+     return {res:same,txt:`Author's rule: same rajju group → ${same} (${sev}). Direction data not used.`}},
+   vedha:(nb,ng)=>{if(!R.vedha||!R.vedha.pairs||!vp.pairs.length)return null;const hit=vp.pairs.some(p=>(p[0]===nb&&p[1]===ng)||(p[0]===ng&&p[1]===nb));return {res:hit?'not':'agree',txt:`Author's Vedha pair list (${vp.pairs.length} pairs): ${hit?'the two stars form a pair':'not a pair'}.`}},
+   pts:id=>{const p=(rb.points||{})[id];return p&&okn(p.max)&&p.max!==''?{max:+p.max,mod:okn(p.mod)&&p.mod!==''?+p.mod:+p.max/2}:null}};
+}
+function dkQ(){const P=dks();if(P.prof==='anoopam'&&dkrb())return dkQrb(dkrb());return dkQcommon(P)}
+/* ---- calculation (profile driven) ---- */
+function dkCalc(M){
+  const P=dks(),Q=dkQ(),sb=M.S.sb,sg=M.S.sg,nb=M.S.nb,ng=M.S.ng,lb=M.S.lb,lg=M.S.lg,cnt=(a,b)=>((b-a+27)%27)+1;
+  const c=cnt(ng,nb),c2=cnt(nb,ng),R={},nd=w=>({res:'pending',calc:`${DK_PEND}: ${w}`});
+  const put=(id,x,boy,girl,extra)=>{R[id]=x?Object.assign({res:x.res,boy,girl,calc:x.txt},extra||{}):nd(Q.author?'not defined in the rulebook – fill this section in the Rulebook tab.':'no documented rule available.');if(!x){R[id].boy=boy;R[id].girl=girl}};
+  put('DINA',Q.dina(c,c2),NAKS[nb],NAKS[ng]);
+  const gb=Q.ganaOf(nb),gg=Q.ganaOf(ng);
+  put('GANA',gb&&gg?Q.gana(gb,gg):null,MK_GANA_NAME[gb]||'–',MK_GANA_NAME[gg]||'–');
+  put('MAHENDRA',Q.mah(c,c2),NAKS[nb],NAKS[ng]);
+  put('STREE',Q.stree(c,c2),NAKS[nb],NAKS[ng]);
+  const yb=Q.yoniOf(nb),yg=Q.yoniOf(ng);
+  put('YONI',yb&&yg?Q.yoni(yb,yg):null,yb?MK_YONI_NAMES[yb[0]]+(yb[1]?' ('+yb[1]+')':''):'–',yg?MK_YONI_NAMES[yg[0]]+(yg[1]?' ('+yg[1]+')':''):'–');
+  const cs=((sb-sg+12)%12)+1;
+  put('RASI',Q.rasi(cs),SIGNS[sb],SIGNS[sg],{cs});R.RASI.cs=cs;
+  const r1=lb===lg?'Same':mkRelP(lb,lg),r2=lb===lg?'Same':mkRelP(lg,lb),rs=Q.rasya(r1,r2,lb===lg);
+  put('RASYA',rs,lb+' (lord of '+SIGNS[sb]+')',lg+' (lord of '+SIGNS[sg]+')',{r1,r2});if(R.RASYA.r1===undefined){R.RASYA.r1=r1;R.RASYA.r2=r2}
+  const vs=Q.vasya(sb,sg,M);
+  if(vs){R.VASYA={res:vs.res,boy:vs.boy,girl:vs.girl,calc:vs.txt}}else R.VASYA=Object.assign(nd(Q.author?'not defined in the rulebook – fill the Vasya table.':'the sources consulted do not reproduce the Dashakoot Vasya sign table; the Ashtakoot Vashya table is NOT imported unless you choose the "borrowed" preference.'),{boy:SIGNS[sb],girl:SIGNS[sg]});
+  const jb=Q.rajjuOf(nb),jg=Q.rajjuOf(ng),jn=i=>i===null||i===undefined?'–':(rbRajjuName(i));
+  put('RAJJU',jb!==null&&jg!==null?Q.rajju(jb,jg,nb,ng):null,jn(jb),jn(jg));
+  put('VEDHA',Q.vedha(nb,ng),NAKS[nb],NAKS[ng]);
+  const useP=P.pts!=='none';
+  const rows=DK_KOOTAS.map((k,i)=>{const r=R[k[0]];let mx=k[4],md=k[4]/2,mAg=1;if(P.pts==='rulebook'){const p=Q.pts(k[0]);mx=p?p.max:null;md=p?p.mod:null}else if(P.pts==='ten'||P.pts==='w36'){const sc=Q.author&&dkrb()&&dkrb().scales&&dkrb().scales[P.pts],w=sc&&sc.weights?sc.weights[k[0]]:null;mx=(w===undefined||w===null||w==='')?null:+w;md=mx===null?null:mx*(sc.mult&&sc.mult.moderate!==undefined&&sc.mult.moderate!==''?+sc.mult.moderate:0.5);mAg=sc&&sc.mult&&sc.mult.agree!==undefined&&sc.mult.agree!==''?+sc.mult.agree:1}
+    let pts=null;if(useP&&r.res!=='pending'&&mx!==null)pts=r.res==='agree'?mx*mAg:r.res==='moderate'?md:0;
+    return {no:i+1,id:k[0],name:k[1],hi:k[2],tamil:k[3],max:mx,pts,res:r.res,boy:r.boy,girl:r.girl,calc:r.calc,what:k[5],area:P.area==='sheet'?k[6]:k[5],r1:r.r1,r2:r.r2,cs:r.cs}});
+  const cn2=x=>rows.filter(r=>r.res===x).length,agree=cn2('agree'),mod=cn2('moderate'),not=cn2('not'),pend=cn2('pending'),need=+P.min;
+  const tot=useP?rows.reduce((a,r)=>a+(r.pts||0),0):null,max=useP?rows.filter(r=>r.res!=='pending'&&r.max!==null).reduce((a,r)=>a+r.max,0):null;
+  const scx=(P.pts==='ten'||P.pts==='w36')&&Q.author&&dkrb()&&dkrb().scales&&dkrb().scales[P.pts],bench=scx&&scx.benchmark!==undefined&&scx.benchmark!==''?+scx.benchmark:null;
+  return {rows,agree,mod,not,pend,need,met:agree>=need,rajju:R.RAJJU.res,vedha:R.VEDHA.res,tot,max,bench,scaleName:scx?scx.name:null,c,c2,cs,bride:ng,groom:nb,profile:Q.label,author:Q.author};
+}
+const rbRajjuName=i=>{const rb=dks().prof==='anoopam'&&dkrb();const n=rb&&rb.rajjuNames;return (n&&n[i])||DK_RAJJU_NAMES[i]||('Group '+(+i+1))};
+/* ---- user-defined exceptions ---- */
+const DK_CATROW={Dina:'DINA',Gana:'GANA',Mahendra:'MAHENDRA','Stree Deergha':'STREE',Yoni:'YONI',Rasi:'RASI','Rasi Adhipati':'RASYA',Vashya:'VASYA',Rajju:'RAJJU',Vedha:'VEDHA'};
+
+/* ---- the author's supplied rule set (pasted by Anoopam Shukla; source: author-supplied reference text, not independently verified) ---- */
+/* Varnadi Panchaka 27x27 matrix supplied by the author (row = bride's star, column = groom's star; S=Sama A=Sadhaka B=Bheda P=Prati V=Vadha) */
+const DKRB_VARNADI_MATRIX=['SBPAVSBPAVSBPAVSBPAVSBPAVSB','BSBPAVSBPAVSBPAVSBPAVSBPAVS','SBSBPAVSBPAVSBPAVSBPAVSBPAV','VSBSBPAVSBPAVSBPAVSBPAVSBPA','AVSBSBPAVSBPAVSBPAVSBPAVSBP','PAVSBSBPAVSBPAVSBPAVSBPAVSB','BPAVSBSBPAVSBPAVSBPAVSBPAVS','SBPAVSBSBPAVSBPAVSBPAVSBPAV','VSBPAVSBSBPAVSBPAVSBPAVSBPA','AVSBPAVSBSBPAVSBPAVSBPAVSBP','PAVSBPAVSBSBPAVSBPAVSBPAVSB','BPAVSBPAVSBSBPAVSBPAVSBPAVS','SBPAVSBPAVSBSBPAVSBPAVSBPAV','VSBPAVSBPAVSBSBPAVSBPAVSBPA','AVSBPAVSBPAVSBSBPAVSBPAVSBP','PAVSBPAVSBPAVSBSBPAVSBPAVSB','BPAVSBPAVSBPAVSBSBPAVSBPAVS','SBPAVSBPAVSBPAVSBSBPAVSBPAV','VSBPAVSBPAVSBPAVSBSBPAVSBPA','AVSBPAVSBPAVSBPAVSBSBPAVSBP','PAVSBPAVSBPAVSBPAVSBSBPAVSB','BPAVSBPAVSBPAVSBPAVSBSBPAVS','SBPAVSBPAVSBPAVSBPAVSBSBPAV','VSBPAVSBPAVSBPAVSBPAVSBSBPA','AVSBPAVSBPAVSBPAVSBPAVSBSBP','PAVSBPAVSBPAVSBPAVSBPAVSBSB','BPAVSBPAVSBPAVSBPAVSBPAVSBS'].join('\n');
+/* point scales supplied by the author */
+const DKRB_SCALES_AUTHOR={ten:{name:'Standard 10-point scale (1 point per porutham)',weights:{DINA:1,GANA:1,MAHENDRA:1,STREE:1,YONI:1,RASI:1,RASYA:1,VASYA:1,RAJJU:1,VEDHA:1},mult:{agree:1,moderate:0.5,not:0},benchmark:6},w36:{name:'Weighted 36-point scale',weights:{DINA:3,GANA:6,MAHENDRA:2,STREE:2,YONI:4,RASI:5,RASYA:5,VASYA:2,RAJJU:5,VEDHA:2},mult:{agree:1,moderate:0.5,not:0},benchmark:18}};
+const DKRB_RAJJU_DIR_AUTH='AAAASVVVVAAAASVVVVAAAASVVVV'.split('');
+const DKRB_RAJJU_SEV=['Moderate severity','Moderate severity','Moderate severity','High severity','Absolute rejection – no cancellation'];
+const DKRB_AUTH_VASYA=[[4,7],[3,6],[5],[7,8],[6],[2,11],[9,5],[3],[11],[0,10],[0],[9]];
+const DKRB_AUTH_SEX=['M','M','F','M','F','F','F','M','M','M','F','M','F','F','M','M','F','M','M','M','M','F','F','F','M','F','F'];
+const DKRB_STARS_SAME=['Rohini','Ardra','Magha','Hasta','Vishakha','Shravana','Uttara Bhadrapada','Revati'];
+const DKRB_NOTES_AUTHOR=`Rule set supplied by the author (Anoopam Shukla) from reference texts pasted into AppstroSutras on 2026-11-14; not independently verified against primary Sanskrit texts. Points flagged for the author's review:
+1. Dina: one pasted list gave remainders "2,4,6,8,9,11,13,15,18,20,24,26" and another "2,4,6,8,9(0)". The second (remainders 2,4,6,8,0 after dividing by 9) is used.
+2. Rasi: the passing counts include 12, while the same text says 2/12 is strictly avoided. Count 12 is set to "agrees" as in the passing rule; please confirm.
+3. Yoni sexes: the pasted table makes Bharani male and Revati female, the reverse of the Ashtakoot table in this app. The sex is shown but does not change the table value. The pasted friendly examples "Elephant & Cow" and "Monkey & Sheep" disagree with the 14×14 table (Elephant–Cow neutral; Sheep–Monkey is also in the enemy list). The 14×14 table is copied from the Ashtakoot yoni table; please review.
+4. Vasya: the pasted example "Virgo & Pisces are mutual" does not follow from the pasted table (Pisces lists only Capricorn), so Virgo–Pisces is read as one-way (moderate).
+5. Gana: the later JSON supplied by the author gives bride Deva + groom Rakshasa = Madhyama (moderate) and bride Manushya + groom Rakshasa = Adhama; this table is used. The earlier text said bride Deva + groom Rakshasa is acceptable only if Rashi Adhipati is strong; that exception (AS_EXC_005) is kept as a record but now adds little.
+6. Rasi Adhipati: per the author's implementation notes it passes when both lords are friends or one is a friend and the other neutral, and fails when either lord treats the other as an enemy (friend+enemy and neutral+enemy are set to does-not-agree). Neutral+neutral is not stated and keeps the common-source reading (moderate).
+6a. Passing: the author's notes call Uttama and Madhyama both "pass", so the author's decision rule counts moderate (Madhyama) results as passing (switchable in the Rulebook tab). Blank entries in the later JSON (Dina pass remainders, Stree Deergha moderate range, Rasi pass counts, most of the Vasya map, some Vedha pairs) were not used; the values from the author's earlier text stand.
+7. Varnadi Panchaka: the five categories and the 27 × 27 star-pair matrix (row = bride's star, column = groom's star) were supplied by the author. The matrix is a regular repeating pattern (a cycle of five with the diagonal fixed at Sama) and is not symmetric, so each direction is read separately; its source could not be checked.
+10. Point scales: the author supplied a 10-point scale (1 per porutham, Madhyama 0.5; 6 or more standard, 7 or more strong, 5 the bare minimum with Rajju and Vedha both full) and a weighted 36-point scale (Dina 3, Gana 6, Mahendra 2, Stree Deergha 2, Yoni 4, Rashi 5, Rashi Adhipati 5, Vasya 2, Rajju 5, Vedha 2; benchmark 18). The text's 0.5 for Dina (Eka Nakshatra) and Rashi (dosha cancellation) refers to exceptions; exceptions never change a result here, so those half points are not awarded. An earlier text called 8 or more matching poruthams highly auspicious, this one calls a 10-point score of 7 or more strong; both are kept as written.
+11. Gatekeepers (author's text and JSON): Rajju – same group in Siro = hard reject, no cancellation; same group with one star Aroha and the other Avaroha = soft pass (Apavada, switchable); same group and same direction = hard reject; different groups pass. Vedha pair = hard reject, non-cancellable at the Nakshatra level (a chart-level review exception is recorded as AS_EXC_017). Decision order: Rajju → Vedha → threshold (5, 6 or 7 poruthams): REJECTED_GATEKEEPER_DOSHA, APPROVED or REJECTED_LOW_SCORE. Varnadi bidirectional rule: Uttama = both directions Sama or Sadhaka; Madhyama = one direction Sama or Sadhaka and the other Bheda; Adhama = either direction Vadha or both Prati. Combinations the rule does not mention (for example Prati with Sama, Prati with Bheda, Bheda with Bheda) are shown as "not covered" rather than guessed. The master JSON again had blank fields (matrix rows 1–26, the first Vedha pair, the Vasya map, Dina remainders, Rasi pass counts); the earlier values stand.`;
+function dkrbBuild(mode){
+  const mk=(f)=>NAKS.map((n,i)=>f(i));
+  const rb={format:DKRB_FORMAT,name:'Anoopam Shukla Rulebook',author:'Anoopam Shukla',version:'1.0',created:new Date().toISOString().slice(0,10),status:'Author-defined – not independently verified',notes:'',src:{},rules:{},points:{},exc:[],decision:{},varnadi:{},rajjuNames:['Pada (foot)','Kati (thigh)','Udara (abdomen)','Kantha (neck)','Siro (head)']};
+  rb.nak=mk(i=>mode==='blank'?{gana:'',yoni:'',sex:'',rajju:'',dir:''}:{gana:MK_GANA_OF[i],yoni:String(MK_YONI_OF[i][0]),sex:mode==='author'?DKRB_AUTH_SEX[i]:MK_YONI_OF[i][1],rajju:String(DK_RAJJU_OF[i]),dir:mode==='author'?DKRB_RAJJU_DIR_AUTH[i]:''});
+  if(mode!=='blank'){
+    rb.rules={dina:{dir:'bg',div:9,fav:[2,4,6,8,0]},mah:{dir:'bg',counts:DK_MAH.slice()},stree:{dir:'bg',op:'>',n:13,modOp:'>=',modN:9},
+      gana:mode==='author'?[['agree','moderate','moderate'],['moderate','agree','not'],['not','not','agree']]:[['agree','moderate','not'],['moderate','agree','not'],['not','not','agree']],
+      yoni:{m:MK_YONI_M.map(r=>r.slice()),agree:3,mod:2},
+      rasi:mode==='author'?['agree','not','not','not','not','not','agree','not','agree','agree','agree','agree']:['agree','not','not','not','not','not','agree','not','agree','agree','agree','moderate'],
+      rasya:mode==='author'?{Same:'agree',FF:'agree',FN:'moderate',NN:'moderate',FE:'not',NE:'not',EE:'not'}:{Same:'agree',FF:'agree',FN:'agree',NN:'moderate',FE:'moderate',NE:'moderate',EE:'not'},
+      vasya:mode==='author'?Array.from({length:12},(_,r)=>Array.from({length:12},(_,c)=>{if(r===c)return '✓';const f=DKRB_AUTH_VASYA[r].includes(c),b=DKRB_AUTH_VASYA[c].includes(r);return f&&b?'✓':(f||b)?'~':'✗'})):Array.from({length:12},()=>Array(12).fill('')),
+      rajju:mode==='author'?{same:'not',siro:'not',opp:'moderate',sameDir:'not',exc:'yes'}:{same:'not'},vedha:{pairs:DK_VEDHA_PAIRS.map(p=>NAKS[p[0]]+' - '+NAKS[p[1]]).join('\n')}};
+    DK_KOOTAS.forEach(k=>rb.points[k[0]]={max:k[4],mod:k[4]/2});
+    if(mode==='author'){
+      rb.points={};
+      rb.notes=DKRB_NOTES_AUTHOR;rb.status='Author-defined (supplied rule set) – not independently verified';
+      rb.scales=JSON.parse(JSON.stringify(DKRB_SCALES_AUTHOR));
+      rb.decision={gate:['RAJJU','VEDHA'],core:['DINA','GANA','YONI','RASI'],coreMin:3,pancha:['DINA','GANA','YONI','RASI','RAJJU'],good:6,high:8,modPass:'yes'};
+      rb.varnadi={names:{S:'Sama',A:'Sadhaka',B:'Bheda',P:'Prati',V:'Vadha'},meaning:{S:'Friend / equal – harmonious, supportive, cooperative',A:'Seeker / accomplisher – promotes growth, learning, achievement',B:'Division – mild differences, minor misunderstandings',P:'Opposite – contradiction, resistance, friction',V:'Enemy / obstruction – delays, blocks, denial of harmony'},verdict:{S:'agree',A:'agree',B:'moderate',P:'not',V:'not'},matrix:DKRB_VARNADI_MATRIX};
+      const ex=(id,cat,name,c1,c2,c3,c4,effect,def,source,stars)=>({id,cat,name,c1:c1||'',c2:c2||'',c3:c3||'',c4:c4||'',effect,def,source:source||'Author-supplied rule set',stars:stars||''});
+      rb.exc=[
+        ex('AS_EXC_001','Dina','Same star (Eka Nakshatra) – listed stars','same_star_listed','','','','Full cancellation','If both share the same Nakshatra, Dina passes for Rohini, Ardra, Magha, Hasta, Vishakha, Shravana, Uttara Bhadrapada and Revati.','Author-supplied rule set',DKRB_STARS_SAME.join(', ')),
+        ex('AS_EXC_002','Dina','Mahendra compensates a failed Dina','mahendra_agrees','','','','Partial mitigation','If Mahendra passes it often compensates for a failed Dina.'),
+        ex('AS_EXC_003','Dina','Rashi Adhipati and Mahendra strong','rasya_agrees','mahendra_agrees','','','Partial mitigation','In South Indian practice, if Rashi Adhipati and Mahendra are strong, minor mismatches in Dina or Stree Deergha are often overruled.'),
+        ex('AS_EXC_004','Dina','Vasya passes','vasya_agrees','','','','Partial mitigation','A passing Vasya (especially mutual) softens the friction of a weak Dina.'),
+        ex('AS_EXC_005','Gana','Groom Rakshasa, bride Deva – Rashi Adhipati strong','groom_rakshasa_bride_deva','rasya_agrees','','','Partial mitigation','Groom Rakshasa + bride Deva is acceptable if Rashi Adhipati is strong.'),
+        ex('AS_EXC_006','Mahendra','Vasya passes','vasya_agrees','','','','Partial mitigation','A passing Vasya softens the friction of a weak Mahendra.'),
+        ex('AS_EXC_007','Stree Deergha','Strong Rashi and Rashi Adhipati','rasi_agrees','rasya_agrees','','','Full cancellation','If both Rashi and Rashi Adhipati pass cleanly, the Stree Deergha mismatch is overruled.'),
+        ex('AS_EXC_008','Stree Deergha','Groom\'s star 4th or 7th from the bride\'s (Mahendra)','count_is_4_or_7','mahendra_agrees','','','Full cancellation','If the groom\'s star falls at the 4th or 7th position from the bride\'s (Mahendra passes), the lack of Stree Deergha is neutralised.'),
+        ex('AS_EXC_009','Stree Deergha','Same star, different padas – listed stars','same_star_listed','different_padas','','','Full cancellation','Sharing the same star (count 1) does not trigger Stree Deergha Dosha for the listed stars if they belong to different padas.','Author-supplied rule set',DKRB_STARS_SAME.join(', ')),
+        ex('AS_EXC_010','Stree Deergha','Vasya passes','vasya_agrees','','','','Partial mitigation','A passing Vasya softens the friction of a weak Stree Deergha.'),
+        ex('AS_EXC_011','Yoni','Rashi Adhipati strong (lords close friends)','rasya_agrees','','','','Partial mitigation','If the Moon-sign lords are close natural friends, the Yoni friction is significantly softened.'),
+        ex('AS_EXC_012','Yoni','Dina, Gana, Rashi and Rajju all pass','dina_agrees','gana_agrees','rasi_agrees','rajju_agrees','Partial mitigation','If Dina, Gana, Rashi and Rajju all pass cleanly, a neutral or mildly unfriendly Yoni is accepted. Direct Vaira Yoni (sworn enemies) still needs chart-level verification of the 7th house and Venus/Mars.'),
+        ex('AS_EXC_013','Rasi','Rashi Adhipati friendly','rasya_agrees','','','','Partial mitigation','If Rashi Adhipati is friendly, the Rashi dosha is reduced.'),
+        ex('AS_EXC_014','Rasi','Groom even sign 6th/8th from bride\'s odd sign','rasi_68_even_from_odd','','','','Partial mitigation','If the groom\'s Rashi is an even sign and falls 6th or 8th from the bride\'s odd Rashi, the dosha is reduced.'),
+        ex('AS_EXC_015','Vashya','Rashi and Rashi Adhipati both pass','rasi_agrees','rasya_agrees','','','Full cancellation','If Rashi Porutham and Rashi Adhipati both pass cleanly, a failed Vasya is safely ignored.'),
+        ex('AS_EXC_016','Rajju','Minor Pada/Kati Rajju – strong Rashi Adhipati, Gana and Mahendra','same_sign_or_lords_friends','gana_agrees','mahendra_agrees','rajju_pada_or_kati','Partial mitigation','If both partners share the same Rashi or their Moon-sign lords are close natural friends (and Gana and Mahendra pass), a minor Pada or Kati Rajju dosha is softened. Siro Rajju is never cancelled.'),
+        ex('AS_EXC_017','Vedha','Chart-level review (Jataka) only','lords_same','jupiter_aspects_7th_both','dina_gana_rajju_agree','','Partial mitigation','Vedha Dosha is treated as non-cancellable at the Nakshatra level. Cancellation is permitted only in a full horoscope review: both partners share the same Rashi lord, benefic Jupiter aspects the 7th house, and Dina, Gana and Rajju pass cleanly.')];
+      V.dkrbOpen=null;
+    }
+  }
+  return rb;
+}
+function dkrbNew(mode){
+  if(dkrb()&&!confirm('Replace the existing rulebook with a new one? Export it first if you want to keep it.'))return;
+  const rb=dkrbBuild(mode);dkrbSave(rb);V.dkrbOpen=null;if(mode==='author'){const P=dks();P.prof='anoopam';S.ui.dk=Object.assign({},P);save()}render();
+}
+function dkrbExcAdd(){const rb=dkrb();rb.exc=rb.exc||[];rb.exc.push({id:'AS_EXC_'+String(rb.exc.length+1).padStart(3,'0'),cat:'Gana',name:'New exception',c1:'lords_same_or_friends',c2:'',c3:'',c4:'',effect:'Partial mitigation',def:'',source:'',stars:''});dkrbSave(rb);render()}
+function dkrbParseStars(t){const alias={moola:'Mula',mool:'Mula',dhanistha:'Dhanishta',sravana:'Shravana',aslesha:'Ashlesha',aswini:'Ashwini'};return String(t||'').split(/[,;\n]/).map(s=>s.trim().toLowerCase()).filter(Boolean).map(s=>{if(alias[s])s=alias[s].toLowerCase();return NAKS.findIndex(n=>n.toLowerCase()===s)}).filter(i=>i>=0)}
+const DK_PRED={
+ lords_same_or_friends:['Moon-sign lords are the same or mutual friends',M=>M.same||M.mutF],
+ lords_not_enemies:['Moon-sign lords are not inimical to each other',M=>M.mutFN],
+ same_sign_diff_star:['Same Moon sign, different stars',M=>M.sameSign&&!M.sameNak],
+ same_star_diff_sign:['Same star, different Moon signs',M=>M.sameNak&&!M.sameSign],
+ same_star_listed:['Same star, and the star is in this exception\'s star list',(M,e)=>M.sameNak&&dkrbParseStars(e&&e.stars).includes(M.S.nb)],
+ different_padas:['The two Moons are in different padas',M=>M.B.P.Moon.pada!==M.G.P.Moon.pada],
+ count_is_4_or_7:['Groom\'s star is the 4th or 7th from the bride\'s',M=>[4,7].includes(M.dk.c)],
+ groom_rakshasa_bride_deva:['Groom is Rakshasa and bride is Deva',M=>{const Q=dkQ();return Q.ganaOf(M.S.nb)==='R'&&Q.ganaOf(M.S.ng)==='D'}],
+ rasi_68_even_from_odd:['Groom\'s sign is even and 6th/8th from the bride\'s odd sign',M=>(M.S.sg%2===0)&&(M.S.sb%2===1)&&(M.dk.cs===6||M.dk.cs===8)],
+ dina_agrees:['Dina agrees',M=>dkR(M,'DINA').res==='agree'],gana_agrees:['Gana agrees',M=>dkR(M,'GANA').res==='agree'],mahendra_agrees:['Mahendra agrees',M=>dkR(M,'MAHENDRA').res==='agree'],
+ stree_agrees:['Stree Deergha agrees',M=>dkR(M,'STREE').res==='agree'],yoni_agrees:['Yoni agrees',M=>dkR(M,'YONI').res==='agree'],rasi_agrees:['Rasi agrees',M=>dkR(M,'RASI').res==='agree'],
+ rasya_agrees:['Rasi Adhipati agrees (lords friendly)',M=>dkR(M,'RASYA').res==='agree'],vasya_agrees:['Vasya agrees',M=>dkR(M,'VASYA').res==='agree'],rajju_agrees:['Rajju agrees',M=>dkR(M,'RAJJU').res==='agree'],vedha_agrees:['Vedha agrees',M=>dkR(M,'VEDHA').res==='agree'],
+ same_sign_or_lords_friends:['Same Moon sign, or the Moon-sign lords are close natural friends',M=>M.sameSign||M.same||M.mutF],
+ rajju_pada_or_kati:['The shared Rajju group is Pada or Kati (minor)',M=>{const Q=dkQ(),a=Q.rajjuOf(M.S.nb),b=Q.rajjuOf(M.S.ng);return a!==null&&a===b&&(a===0||a===1)}],
+ lords_same:['Moon-sign lords are the same planet',M=>M.same],
+ jupiter_aspects_7th_both:['Jupiter aspects (or is in) the 7th house in both charts',M=>{const j=C=>{const s7=(C.lagna+6)%12,f=((s7-C.P.Jupiter.sign+12)%12)+1;return f===1||[5,7,9].includes(f)};return j(M.B)&&j(M.G)}],
+ dina_gana_rajju_agree:['Dina, Gana and Rajju all agree',M=>['DINA','GANA','RAJJU'].every(id=>dkR(M,id).res==='agree')],
+ both_mangal:['Mangal Dosha in both charts',M=>M.mg.B.any&&M.mg.G.any],mars_own_or_exalted:['Mars in own sign or exalted (either chart)',M=>M.mg.B.own||M.mg.B.exalt||M.mg.G.own||M.mg.G.exalt]
+};
+function dkAllExc(){
+  const rb=dkrb(),use=dks().prof==='anoopam'&&rb;
+  if(!use||!rb.exc||!rb.exc.length)return DK_EXC;
+  const mine=rb.exc.map(e=>{const ks=[e.c1,e.c2,e.c3,e.c4].filter(Boolean);return E(e.id,e.cat,e.name||'(unnamed)',e.def||'Author-defined exception.','Target porutham does not agree AND: '+(ks.map(k=>(DK_PRED[k]||['?'])[0]).join(' AND ')||'(no condition)'),'IF target ≠ agree ∧ '+ks.join(' ∧ ')+' THEN '+e.effect,e.effect,'Author-defined (Anoopam Shukla Rulebook v'+rb.version+')',e.source||'Author\'s own rule – source not recorded','A','Applied exactly as defined by the author; the original result is never changed.',
+    M=>{const row=DK_CATROW[e.cat];if(row){const r=dkR(M,row);if(r.res==='agree')return mkNA('The target porutham agrees.');if(r.res==='pending')return mkNA('The target porutham is pending.')}else if(e.cat==='Mangal'){if(!(M.mg.B.any||M.mg.G.any))return mkNA('No Mangal Dosha.')}
+      if(!ks.length)return mkR('No condition defined – manual review.');
+      const failed=ks.filter(k=>!(DK_PRED[k]&&DK_PRED[k][1](M,e)));return failed.length?mkN('Not met: '+failed.map(k=>(DK_PRED[k]||['?'])[0]).join('; ')):mkY('All conditions met: '+ks.map(k=>DK_PRED[k][0]).join('; ')+'.')})});
+  return DK_EXC.concat(mine);
+}
+/* ---- verdict by the author's decision rule, and Varnadi Panchaka from the author's matrix ---- */
+function dkVerdict(D){
+  const rb=dkrb(),use=dks().prof==='anoopam'&&rb&&rb.decision&&rb.decision.gate;
+  if(!use)return null;
+  const d=rb.decision,g=id=>D.rows.find(r=>r.id===id),res=id=>g(id).res,ps=d.modPass==='no'?['agree']:['agree','moderate'],pass=r=>ps.includes(r);
+  const gate=(d.gate||[]).map(id=>({id,res:res(id)})),core=(d.core||[]).map(id=>({id,res:res(id)})),pancha=(d.pancha||[]).map(id=>({id,res:res(id)}));
+  const gateOk=gate.every(x=>pass(x.res)),gatePend=gate.some(x=>x.res==='pending'),coreN=core.filter(x=>pass(x.res)).length,coreOk=coreN>=(d.coreMin||0),n=D.rows.filter(r=>pass(r.res)).length;
+  const level=n>=(d.high||99)?'Highly auspicious (Uttama)':n>=(d.good||99)?'Good (Madhyama)':'Below the good threshold';
+  const verdict=!gateOk?(gatePend?'Gatekeeper pending – cannot be concluded':'Rejected under the decision rule: a mandatory gatekeeper fails (Rajju / Vedha)'):(!coreOk?'Core pillars not met – '+coreN+' of '+core.length+' agree (need '+d.coreMin+')':n>=(d.good||99)?level:'Gatekeepers pass but the count is below the good threshold');
+  const thr=+dks().min,hard=res('RAJJU')==='not'||res('VEDHA')==='not',final=hard?'REJECTED_GATEKEEPER_DOSHA':gatePend?'GATEKEEPER_PENDING':n>=thr?'APPROVED':'REJECTED_LOW_SCORE',siro=res('RAJJU')==='not'&&g('RAJJU').boy===g('RAJJU').girl&&g('RAJJU').boy===rbRajjuName(4);
+  return {gate,core,pancha,gateOk,coreN,coreOk,n,level,verdict,d,final,thr,siro,passMod:d.modPass!=='no',panchaOk:pancha.every(x=>pass(x.res))};
+}
+function dkVarnadiBi(a,b){const ok=c=>c==='S'||c==='A';if(!a||!b)return null;if(ok(a)&&ok(b))return 'agree';if((ok(a)&&b==='B')||(ok(b)&&a==='B'))return 'moderate';if(a==='V'||b==='V'||(a==='P'&&b==='P'))return 'not';return null}
+function dkVarnadi(M){
+  const rb=dkrb(),use=dks().prof==='anoopam'&&rb&&rb.varnadi&&rb.varnadi.names;if(!use)return null;
+  const v=rb.varnadi,lines=String(v.matrix||'').split(/\n/).map(s=>s.replace(/\s+/g,'').toUpperCase()).filter(Boolean),ok=lines.length===27&&lines.every(l=>l.length===27&&[...l].every(ch=>v.names[ch]));
+  const code=(a,b)=>ok?lines[a][b]:null;
+  return {v,ok,bg:code(M.S.ng,M.S.nb),gb:code(M.S.nb,M.S.ng),bi:ok?dkVarnadiBi(code(M.S.ng,M.S.nb),code(M.S.nb,M.S.ng)):null};
+}
+/* ---- rulebook editor tab ---- */
+const dkSel=(path,cur,arr,type)=>`<select onchange="dkrbP('${path}',this.value${type?",'"+type+"'":''})">${opt(arr,cur)}</select>`;
+const numIn=(path,cur,w)=>`<input type="number" step="any" value="${cur===undefined||cur===null?'':cur}" style="width:${w||70}px" onchange="dkrbP('${path}',this.value,'n')">`;
+function dkRbTab(M){
+  const rb=dkrb(),P=dks();
+  if(!rb)return `<div class="card"><h3 style="margin-top:0">Rulebook – Anoopam Shukla</h3>
+   <p>This is your own rulebook for Dashakoot Vichar. You enter every table, count, threshold, point value and exception yourself, and the engine applies exactly what you enter.</p>
+   <div class="row"><button class="pri" onclick="dkrbNew('author')">Create from the rule set you supplied (Dasa Porutham)</button><button onclick="dkrbNew('common')">Copy the common South Indian profile</button><button onclick="dkrbNew('blank')">Start blank</button>
+   <label style="display:inline;margin:0">Import: <input type="file" accept=".json" onchange="dkrbImport(this)"></label></div>
+   <p class="mute" style="margin-bottom:0">The rulebook is stored only on this device. Use Export to keep a copy or to move it to another computer.</p></div>`;
+  const R=rb.rules||{},N=rb.nak||[],dc=rb.decision||{},vn=rb.varnadi||{};
+  const vp=dkrbParsePairs(R.vedha&&R.vedha.pairs),inUse=P.prof==='anoopam';
+  const chk=[];const add=(ok,t)=>chk.push(`<li>${ok?'<span class="ok">✓</span>':'<span class="mute">✗</span>'} ${t}</li>`);
+  add(N.length===27&&N.every(e=>e.gana),'Gana of all 27 stars');add(N.every(e=>e.yoni!==''&&e.yoni!==undefined),'Yoni of all 27 stars');add(N.every(e=>e.rajju!==''&&e.rajju!==undefined),'Rajju group of all 27 stars');
+  add(!!(R.dina&&R.dina.fav&&R.dina.fav.length),'Dina rule');add(!!(R.mah&&R.mah.counts&&R.mah.counts.length),'Mahendra rule');add(!!(R.stree&&R.stree.n!==undefined&&R.stree.n!==''),'Stree Deergha rule');
+  const gm=R.gana?R.gana.flat().filter(Boolean).length:0;add(gm===9,'Gana 3×3 table ('+gm+' / 9 cells set)');add(!!(R.yoni&&R.yoni.m&&R.yoni.m.flat().every(v=>v!==''&&v!==undefined)),'Yoni 14×14 table');add(!!(R.rasi&&R.rasi.length===12&&R.rasi.every(Boolean)),'Rasi table (12 counts)');
+  const rc=R.rasya?DKRB_REL.filter(([k])=>R.rasya[k]).length:0;add(rc===7,'Rasi-lord table ('+rc+' / 7 cases set)');const vc=R.vasya?R.vasya.flat().filter(Boolean).length:0;add(vc===144,'Vasya table ('+vc+' / 144 cells set)');
+  add(vp.pairs.length>0&&!vp.bad.length,'Vedha pairs ('+vp.pairs.length+' valid'+(vp.bad.length?', '+vp.bad.length+' unreadable line(s)':'')+')');add(!!(R.rajju&&R.rajju.same),'Rajju same-group result');add(!!(dc.gate&&dc.gate.length),'Decision rule (gatekeepers, core pillars, thresholds)');
+  const vl=String(vn.matrix||'').split(/\n/).filter(s=>s.trim()).length;add(vl===27,'Varnadi Panchaka 27 × 27 matrix ('+vl+' / 27 lines)');add(Object.keys(rb.points||{}).length===10,'Point values (optional)');
+  const cover=`<div class="card" style="border-top:4px solid #c9a227"><div class="row"><h3 style="margin:0">Rulebook – ${esc(rb.name)}</h3><span class="tag">v${esc(rb.version)}</span><span class="tag">${esc(rb.status)}</span>${inUse?'<span class="tag ok">in use</span>':''}</div>
+    <div class="row" style="margin-top:8px"><label style="margin:0">Rulebook name<br><input value="${esc(rb.name)}" style="width:240px" onchange="dkrbP('name',this.value)"></label><label style="margin:0">Author<br><input value="${esc(rb.author)}" style="width:200px" onchange="dkrbP('author',this.value)"></label><label style="margin:0">Version<br><input value="${esc(rb.version)}" style="width:80px" onchange="dkrbP('version',this.value)"></label><label style="margin:0">Status<br><input value="${esc(rb.status)}" style="width:300px" onchange="dkrbP('status',this.value)"></label></div>
+    <label>Notes and points flagged for the author's review</label><textarea style="min-height:90px" onchange="dkrbP('notes',this.value)">${esc(rb.notes||'')}</textarea>
+    <div class="row noprint" style="margin-top:8px"><button class="pri" onclick="dkSet('prof','anoopam')"${inUse?' disabled':''}>${inUse?'This rulebook is in use':'Use this rulebook now'}</button><button onclick="dkSet('prof','south')">Switch back to the common profile</button><button onclick="dkrbExport()">Export (.json)</button><label style="display:inline;margin:0">Import: <input type="file" accept=".json" onchange="dkrbImport(this)"></label><button onclick="window.print()">Print rulebook</button><button onclick="dkrbNew('author')">Re-create from the supplied rule set</button><button class="danger" onclick="dkrbDelete()">Delete rulebook…</button></div>
+    <p class="mute" style="margin:8px 0 0">Created ${esc(rb.created)}. Stored only on this device. Sections left blank show as ${DK_PEND}. Results from this rulebook are labelled “author-defined”.</p>
+    <details style="margin-top:6px"><summary><b>Completeness check</b></summary><ul style="margin:4px 0 0 18px;list-style:none">${chk.join('')}</ul></details></div>`;
+  const sec=(t,body)=>`<details class="card" style="margin:0 0 10px"${V.dkrbOpen===t?' open':''} ontoggle="if(this.open)V.dkrbOpen='${t}'"><summary><b>${t}</b></summary><div style="margin-top:8px">${body}</div></details>`;
+  const gOpt=[['','—'],['D','Deva'],['M','Manushya'],['R','Rakshasa']],sexOpt=[['','—'],['M','Male'],['F','Female']],yOpt=[['','—']].concat(MK_YONI_NAMES.map((n,i)=>[String(i),n])),rjOpt=[['','—']].concat([0,1,2,3,4].map(i=>[String(i),rbRajjuName(i)]));
+  const nakT=`<div style="overflow-x:auto"><table><tr><th>#</th><th>Nakshatra</th><th>Gana</th><th>Yoni animal</th><th>Yoni sex</th><th>Rajju group</th><th>Rajju direction</th></tr>${NAKS.map((n,i)=>{const e=N[i]||{};return `<tr><td>${i+1}</td><td translate="no">${n}</td><td>${dkSel('nak.'+i+'.gana',e.gana||'',gOpt)}</td><td>${dkSel('nak.'+i+'.yoni',e.yoni===undefined?'':e.yoni,yOpt)}</td><td>${dkSel('nak.'+i+'.sex',e.sex||'',sexOpt)}</td><td>${dkSel('nak.'+i+'.rajju',e.rajju===undefined?'':e.rajju,rjOpt)}</td><td>${dkSel('nak.'+i+'.dir',e.dir||'',[['','—'],['A','Aroha (ascending)'],['V','Avaroha (descending)'],['S','Siro (head)']])}</td></tr>`}).join('')}</table></div>
+    <p class="mute" style="margin:6px 0 0">Rajju group names:</p><div class="row">${[0,1,2,3,4].map(i=>`<input value="${esc(rbRajjuName(i))}" style="width:140px" onchange="dkrbP('rajjuNames.${i}',this.value)">`).join('')}</div>`;
+  const dirOpt=[['bg','Bride → groom'],['gb','Groom → bride']],opOpt=[['>','greater than'],['>=','at least']];
+  const dina=R.dina||{},mah=R.mah||{},st=R.stree||{};
+  const counts=sec('Dina, Mahendra, Stree Deergha',`<div class="row"><b style="width:120px">Dina</b>count ${dkSel('rules.dina.dir',dina.dir||'bg',dirOpt)} divide by ${numIn('rules.dina.div',dina.div===undefined?9:dina.div,50)} favourable remainders <input value="${esc((dina.fav||[]).join(', '))}" style="width:130px" placeholder="2, 4, 6, 8, 0" onchange="dkrbP('rules.dina.fav',this.value,'l')"></div>
+    <div class="row" style="margin-top:6px"><b style="width:120px">Mahendra</b>count ${dkSel('rules.mah.dir',mah.dir||'bg',dirOpt)} favourable counts <input value="${esc((mah.counts||[]).join(', '))}" style="width:260px" placeholder="4, 7, 10, 13, 16, 19, 22, 25" onchange="dkrbP('rules.mah.counts',this.value,'l')"></div>
+    <div class="row" style="margin-top:6px"><b style="width:120px">Stree Deergha</b>count ${dkSel('rules.stree.dir',st.dir||'bg',dirOpt)} full when count is ${dkSel('rules.stree.op',st.op||'>',opOpt)} ${numIn('rules.stree.n',st.n,60)} · moderate when ${dkSel('rules.stree.modOp',st.modOp||'>',opOpt)} ${numIn('rules.stree.modN',st.modN,60)} <span class="mute">(blank = none)</span></div>`);
+  const gT=R.gana||[['','',''],['','',''],['','','']],ganaT=sec('Gana table',`<table><tr><th>Bride \\ Groom</th><th>Deva</th><th>Manushya</th><th>Rakshasa</th></tr>${['Deva','Manushya','Rakshasa'].map((n,i)=>`<tr><td><b>${n}</b></td>${[0,1,2].map(j=>`<td>${dkSel('rules.gana.'+i+'.'+j,(gT[i]||[])[j]||'',DKRB_RES)}</td>`).join('')}</tr>`).join('')}</table><p class="mute" style="margin:6px 0 0">A cell left “not set” makes Gana pending for that combination.</p>`);
+  const yR=R.yoni||{m:[],agree:'',mod:''},yoniT=sec('Yoni table (14 × 14)',`<div class="row">Agrees when value is at least ${numIn('rules.yoni.agree',yR.agree,50)} · moderate when at least ${numIn('rules.yoni.mod',yR.mod,50)} · otherwise does not agree</div><div style="overflow-x:auto;margin-top:6px"><table style="font-size:12px"><tr><th></th>${MK_YONI_NAMES.map(n=>`<th>${n.slice(0,4)}</th>`).join('')}</tr>${MK_YONI_NAMES.map((n,i)=>`<tr><td><b>${n}</b></td>${MK_YONI_NAMES.map((_,j)=>`<td><input type="number" style="width:46px;padding:2px" value="${(yR.m&&yR.m[i]&&yR.m[i][j]!==undefined)?yR.m[i][j]:''}" onchange="dkrbMat(${i},${j},this.value)"></td>`).join('')}</tr>`).join('')}</table></div>`);
+  const rasiT=sec('Rasi table and Rasi-lord table',`<p class="mute" style="margin:0 0 4px">Rasi: count from the bride's Moon sign to the groom's.</p><div class="row">${Array.from({length:12},(_,i)=>`<label style="margin:0;font-size:12px">${i+1}<br>${dkSel('rules.rasi.'+i,(R.rasi||[])[i]||'',DKRB_RES)}</label>`).join('')}</div>
+    <p class="mute" style="margin:10px 0 4px">Rasi Adhipati: relationship of the two Moon-sign lords (natural friendship read each way).</p><div class="row">${DKRB_REL.map(([k,l])=>`<label style="margin:0;font-size:12px">${l}<br>${dkSel('rules.rasya.'+k,(R.rasya||{})[k]||'',DKRB_RES)}</label>`).join('')}</div>`);
+  const vasOpt=[['','—'],['✓','✓ agrees'],['~','~ moderate'],['✗','✗ does not agree']],vasT=sec('Vasya table (12 × 12)',`<p class="mute" style="margin:0 0 4px">Rows: bride's Moon sign. Columns: groom's Moon sign. ✓ = mutual or same sign (2/2), ~ = one-way (1/2), ✗ = none (0/2). Blank cells leave Vasya pending.</p><div style="overflow-x:auto"><table style="font-size:12px"><tr><th></th>${SABBR.map(s=>`<th>${s}</th>`).join('')}</tr>${SIGNS.map((n,i)=>`<tr><td><b>${SABBR[i]}</b></td>${SIGNS.map((_,j)=>`<td><select style="padding:1px;min-width:46px" onchange="dkrbVas(${i},${j},this.value)">${opt(vasOpt,(R.vasya&&R.vasya[i]&&R.vasya[i][j])||'')}</select></td>`).join('')}</tr>`).join('')}</table></div>`);
+  const rjR=R.rajju||{},vedT=sec('Rajju and Vedha',`<div class="row">If both stars are in the same Rajju group (direction data not available) the result is ${dkSel('rules.rajju.same',rjR.same||'',DKRB_RES)} <span class="mute">(groups and directions are set per nakshatra in the star data table)</span></div><div class="row" style="margin-top:6px">Same Siro group: ${dkSel('rules.rajju.siro',rjR.siro||'',DKRB_RES)} · same group, opposite directions (Aroha with Avaroha): ${dkSel('rules.rajju.opp',rjR.opp||'',DKRB_RES)} · same group, same direction: ${dkSel('rules.rajju.sameDir',rjR.sameDir||'',DKRB_RES)} · exception (Apavada) switched ${dkSel('rules.rajju.exc',rjR.exc||'yes',[['yes','on'],['no','off']])}</div>
+    <p class="mute" style="margin:10px 0 4px">Vedha pairs – one pair per line, for example “Ashwini - Jyeshtha”.</p><textarea style="min-height:120px" onchange="dkrbP('rules.vedha.pairs',this.value)">${esc((R.vedha&&R.vedha.pairs)||'')}</textarea>${vp.bad.length?`<p class="bad" style="margin:4px 0 0">Could not read: ${esc(vp.bad.join(' | '))}</p>`:`<p class="mute" style="margin:4px 0 0">${vp.pairs.length} valid pair(s).</p>`}`);
+  const kOpt=DK_KOOTAS.map(k=>[k[0],k[1]]),dcT=sec('Decision rule (author)',`<p class="mute" style="margin:0 0 6px">Used for the verdict line when this rulebook is in use. It does not change any porutham result.</p>
+    <div class="row"><label style="margin:0">Mandatory gatekeepers (must agree)<br><input value="${esc((dc.gate||[]).join(', '))}" style="width:240px" onchange="dkrbP('decision.gate',this.value,'sl')"></label><label style="margin:0">Core pillars<br><input value="${esc((dc.core||[]).join(', '))}" style="width:300px" onchange="dkrbP('decision.core',this.value,'sl')"></label><label style="margin:0">Core pillars that must agree<br>${numIn('decision.coreMin',dc.coreMin,60)}</label></div>
+    <div class="row" style="margin-top:6px"><label style="margin:0">Essential five (Pancha Porutham)<br><input value="${esc((dc.pancha||[]).join(', '))}" style="width:340px" onchange="dkrbP('decision.pancha',this.value,'sl')"></label><label style="margin:0">“Good” when at least<br>${numIn('decision.good',dc.good,60)}</label><label style="margin:0">“Highly auspicious” when at least<br>${numIn('decision.high',dc.high,60)}</label><label style="margin:0">Madhyama (moderate) counts as a pass<br>${dkSel('decision.modPass',dc.modPass||'yes',[['yes','Yes (Uttama or Madhyama pass)'],['no','No (only “agrees” passes)']])}</label></div>
+    <p class="mute" style="margin:6px 0 0">Use these koota codes: ${DK_KOOTAS.map(k=>k[0]).join(', ')}.</p>`);
+  const vnT=sec('Varnadi Panchaka (author)',`<p class="mute" style="margin:0 0 6px">The five categories as supplied by the author. The star-pair matrix is entered below as 27 lines of 27 letters (row = bride's star, column = groom's star, letters S, A, B, P, V). Until it is complete the Panchaka result stays ${DK_PEND}.</p>
+    <table><tr><th>Code</th><th>Name</th><th>Meaning</th><th>Counts as</th></tr>${['S','A','B','P','V'].map(k=>`<tr><td><b>${k}</b></td><td><input value="${esc((vn.names||{})[k]||'')}" style="width:110px" onchange="dkrbP('varnadi.names.${k}',this.value)"></td><td><input value="${esc((vn.meaning||{})[k]||'')}" style="width:100%;min-width:260px" onchange="dkrbP('varnadi.meaning.${k}',this.value)"></td><td>${dkSel('varnadi.verdict.'+k,(vn.verdict||{})[k]||'',DKRB_RES)}</td></tr>`).join('')}</table>
+    <label>27 × 27 matrix</label><textarea style="min-height:140px;font-family:var(--font-mono);font-size:12px" placeholder="27 lines, each with 27 letters from S A B P V" onchange="dkrbP('varnadi.matrix',this.value)">${esc(vn.matrix||'')}</textarea>`);
+  const ptsT=sec('Point values (optional)',`<p class="mute" style="margin:0 0 4px">Used when “Points display” is set to the author's rulebook. Obtained = maximum when it agrees, the “moderate” value when moderate, zero otherwise. None were supplied, so the table is blank.</p><table><tr><th>Koota</th><th>Maximum</th><th>Moderate value</th></tr>${DK_KOOTAS.map(k=>`<tr><td>${k[1]}</td><td>${numIn('points.'+k[0]+'.max',((rb.points||{})[k[0]]||{}).max,70)}</td><td>${numIn('points.'+k[0]+'.mod',((rb.points||{})[k[0]]||{}).mod,70)}</td></tr>`).join('')}</table>`);
+  const scs=rb.scales||{},scaT=sec('Point scales (author)',`<p class="mute" style="margin:0 0 6px">Two scales supplied by the author. Choose one under Preferences › Points display. Obtained = weight × multiplier (agrees / moderate / does not agree). Exceptions never change the points.</p>${['ten','w36'].map(k=>{const s=scs[k]||{weights:{},mult:{}};return `<div class="card" style="margin:0 0 8px;padding:8px 10px"><div class="row"><input value="${esc(s.name||k)}" style="width:300px" onchange="dkrbP('scales.${k}.name',this.value)"><label style="margin:0">Benchmark ${numIn('scales.'+k+'.benchmark',s.benchmark,60)}</label><label style="margin:0">Agrees × ${numIn('scales.'+k+'.mult.agree',(s.mult||{}).agree,50)}</label><label style="margin:0">Moderate × ${numIn('scales.'+k+'.mult.moderate',(s.mult||{}).moderate,50)}</label><label style="margin:0">Not × ${numIn('scales.'+k+'.mult.not',(s.mult||{}).not,50)}</label></div><div style="overflow-x:auto"><table><tr>${DK_KOOTAS.map(q=>`<th>${q[1]}</th>`).join('')}<th>Total</th></tr><tr>${DK_KOOTAS.map(q=>`<td>${numIn('scales.'+k+'.weights.'+q[0],(s.weights||{})[q[0]],50)}</td>`).join('')}<td><b>${DK_KOOTAS.reduce((a,q)=>a+(+((s.weights||{})[q[0]])||0),0)}</b></td></tr></table></div></div>`}).join('')}`);
+  const catOpt=DK_CATS.filter(x=>x[0]!=='all').map(([v,l])=>[v,l]),eff=MK_EFF.map(x=>[x,x]),pr=[['','— none —']].concat(Object.keys(DK_PRED).map(k=>[k,DK_PRED[k][0]]));
+  const excT=sec('Exception rules (author-defined)',`<p class="mute" style="margin:0 0 6px">Each exception applies automatically when the target porutham does not agree and all chosen conditions hold. It never changes a result; it is listed in the Exception library as author-defined.</p>
+   ${(rb.exc||[]).map((e,i)=>`<div class="card" style="margin:0 0 8px;padding:8px 10px"><div class="row"><b>${esc(e.id)}</b><input value="${esc(e.name)}" style="width:260px" onchange="dkrbP('exc.${i}.name',this.value)"><label style="margin:0">Category ${dkSel('exc.'+i+'.cat',e.cat,catOpt)}</label><label style="margin:0">Effect ${dkSel('exc.'+i+'.effect',e.effect,eff)}</label><button class="sm danger" onclick="dkrbExcDel(${i})">Remove</button></div>
+    <div class="row" style="margin-top:4px">${['c1','c2','c3','c4'].map((c,n)=>`<label style="margin:0">Condition ${n+1} ${dkSel('exc.'+i+'.'+c,e[c]||'',pr)}</label>`).join('')}</div>
+    <div class="row" style="margin-top:4px"><input value="${esc(e.stars||'')}" placeholder="Star list (for 'same star listed'): Rohini, Ardra, …" style="flex:1;min-width:240px" onchange="dkrbP('exc.${i}.stars',this.value)"></div>
+    <div class="row" style="margin-top:4px"><input value="${esc(e.def)}" placeholder="Definition (your words)" style="flex:1;min-width:220px" onchange="dkrbP('exc.${i}.def',this.value)"><input value="${esc(e.source)}" placeholder="Source" style="flex:1;min-width:200px" onchange="dkrbP('exc.${i}.source',this.value)"></div></div>`).join('')||'<p class="mute">No exceptions defined yet.</p>'}<button onclick="dkrbExcAdd()">＋ Add exception</button>`);
+  const srcT=sec('Source notes per koota (optional)',`<table>${DK_KOOTAS.map(k=>`<tr><td style="width:150px">${k[1]}</td><td><input style="width:100%" value="${esc((rb.src||{})[k[0]]||'')}" placeholder="Where this rule comes from (book, chapter, teacher, own research)" onchange="dkrbP('src.${k[0]}',this.value)"></td></tr>`).join('')}</table>`);
+  const sum=`<div class="card"><h3 style="margin-top:0">Rulebook contents (printable summary)</h3><ul style="margin:0 0 0 18px;list-style:none">${chk.join('')}</ul><p class="mute" style="margin:6px 0 0">Source notes: ${DK_KOOTAS.filter(k=>(rb.src||{})[k[0]]).map(k=>k[1]+' – '+esc(rb.src[k[0]])).join('; ')||'none recorded'}.</p></div>`;
+  return cover+sec('Nakshatra data set (Gana, Yoni, Rajju per star)',nakT)+counts+ganaT+yoniT+rasiT+vasT+vedT+dcT+vnT+scaT+ptsT+excT+srcT+sum;
+}
+
+/* ---- Varnadi Panchaka tab with the author's categories; self-test of the rulebook engine ---- */
+function dkVpTab(M){const A=dkVarnadi(M);return A?dkVpAuthor(M,A):dkVp(M)}
+function dkVpAuthor(M,A){
+  const v=A.v,nm=c=>(v.names||{})[c]||c,vd=c=>({agree:'Favourable (passes)',moderate:'Neutral / caution',not:'Fails – avoid'}[(v.verdict||{})[c]]||'not set');
+  const cats=['S','A','B','P','V'].map((c,i)=>`<tr><td>${i+1}</td><td><b>${esc(nm(c))}</b></td><td class="mute">${esc((v.meaning||{})[c]||'')}</td><td>${vd(c)}</td></tr>`).join('');
+  const row=(l,a,b,code)=>`<tr><td>${l}</td><td translate="no">${esc(a)}</td><td translate="no">${esc(b)}</td><td>${code?`<b>${esc(nm(code))}</b>`:`<span class="tag">${DK_PEND}</span>`}</td><td>${code?vd(code):'matrix not supplied'}</td></tr>`;
+  return `<div class="card"><h3 style="margin-top:0">Varnadi Panchaka (वर्णादि पंचक) – author's categories</h3>
+   <p class="mute" style="margin-top:0">Categories as supplied by the author (${esc(dkrb().name)}). The traditional definition in the supplied text is a five-way relationship between the two birth stars – not the first five Ashtakoot kootas. The relationship below is read from the author's 27 × 27 star-pair matrix (row = bride's star, column = groom's star). The matrix is not symmetric, so each direction is read separately.</p>
+   <div style="overflow-x:auto"><table><tr><th>#</th><th>Category</th><th>Meaning</th><th>Counts as</th></tr>${cats}</table></div>
+   <h4 style="margin:12px 0 4px">This couple</h4><div style="overflow-x:auto"><table><tr><th>Direction</th><th>From</th><th>To</th><th>Category</th><th>Result</th></tr>
+   ${row('Bride → groom',NAKS[M.S.ng],NAKS[M.S.nb],A.ok?A.bg:null)}${row('Groom → bride',NAKS[M.S.nb],NAKS[M.S.ng],A.ok?A.gb:null)}<tr style="background:var(--acc2)"><td><b>Both directions</b></td><td colspan="2" class="mute">Author's bidirectional rule</td><td colspan="2">${A.ok?(A.bi?'<b>'+({agree:'UTTAMA',moderate:'MADHYAMA',not:'ADHAMA'}[A.bi])+'</b> – '+({agree:'both directions Sama or Sadhaka',moderate:'one direction Sama or Sadhaka and the other Bheda',not:'either direction is Vadha, or both are Prati'}[A.bi]):'<span class="tag">not covered by the rule</span> – this combination of codes is not mentioned in the supplied rule, so no result is guessed'):'matrix not supplied'}</td></tr></table></div>
+   <p class="mute" style="margin-bottom:0">Varnadi Panchaka is kept separate from the Dashakoot result.</p></div>`;
+}
+function dkrbSelfTest(){
+  const res=[],t=(n,ok)=>res.push({n,ok:!!ok});
+  const oldUi=S.ui,oldV=V.dk;S.ui=Object.assign({},S.ui||{});
+  try{
+    const rb=dkrbBuild('author');S.ui.dkrb=rb;V.dk=Object.assign({},DK_DEF,{prof:'anoopam'});
+    const mk=(sb,nb,sg,ng)=>({S:{sb,sg,nb,ng,lb:LORD[sb],lg:LORD[sg]},B:{P:{Moon:{deg:5}}},G:{P:{Moon:{deg:5}}}});
+    let D=dkCalc(mk(7,0,3,1)),g=id=>D.rows.find(r=>r.id===id);
+    t('Author Vasya: Cancer bride + Scorpio groom are mutual → agrees',g('VASYA').res==='agree');
+    D=dkCalc(mk(11,0,5,1));t('Author Vasya: Virgo bride + Pisces groom is one-way → moderate',g('VASYA').res==='moderate');
+    D=dkCalc(mk(5,0,3,1));t('Author Vasya: Cancer bride + Virgo groom → does not agree',g('VASYA').res==='not');
+    D=dkCalc(mk(2,0,3,1));t('Author Rasi: count 12 (bride Cancer, groom Gemini) agrees (as supplied)',D.cs===12&&g('RASI').res==='agree');
+    D=dkCalc(mk(0,9,0,0));t('Author Stree Deergha: count 10 → moderate (9 or more)',g('STREE').res==='moderate'&&D.c===10);
+    D=dkCalc(mk(0,7,0,0));t('Author Stree Deergha: count 8 → does not agree',g('STREE').res==='not');
+    D=dkCalc(mk(0,14,0,0));t('Author Stree Deergha: count 15 → agrees',g('STREE').res==='agree');
+    D=dkCalc(mk(0,2,0,1));t('Author Gana (JSON table): bride Manushya (Bharani) + groom Rakshasa (Krittika) → Adhama (does not agree)',g('GANA').res==='not');
+    D=dkCalc(mk(0,2,0,0));t('Author Gana (JSON table): bride Deva (Ashwini) + groom Rakshasa (Krittika) → Madhyama (moderate)',g('GANA').res==='moderate');
+    D=dkCalc(mk(2,0,0,0));t('Author Rasi-lord table: Mars (bride) + Mercury (groom) = neutral/enemy → does not agree',g('RASYA').res==='not');
+    D=dkCalc(mk(0,0,0,5));t('Author Gana: bride Manushya (Ardra) + groom Deva (Ashwini) → moderate',g('GANA').res==='moderate');
+    D=dkCalc(mk(0,0,0,0));t('Same star Ashwini/Ashwini: Dina count 1 → does not agree; Rajju same group → does not agree',g('DINA').res==='not'&&g('RAJJU').res==='not');
+    D=dkCalc(mk(0,4,0,13));t('Rajju: both stars Siro (Mrigashira + Chitra) → hard reject, no cancellation',g('RAJJU').res==='not'&&/Siro/.test(g('RAJJU').calc));
+    D=dkCalc(mk(0,0,0,8));t('Rajju: Ashwini (Aroha) + Ashlesha (Avaroha), both Pada → soft pass by the Apavada rule',g('RAJJU').res==='moderate'&&/Apavada/.test(g('RAJJU').calc));
+    D=dkCalc(mk(0,0,0,9));t('Rajju: Ashwini (Aroha) + Magha (Aroha), both Pada → same direction → hard reject',g('RAJJU').res==='not');
+    D=dkCalc(mk(0,0,0,1));t('Rajju: Ashwini (Pada) + Bharani (Kati) → different groups pass',g('RAJJU').res==='agree');
+    D=dkCalc(mk(11,26,7,17));t('Gatekeeper decision: Revati + Jyeshtha (both Pada, both Avaroha) → REJECTED_GATEKEEPER_DOSHA',dkVerdict(D).final==='REJECTED_GATEKEEPER_DOSHA');
+    {const seen={};for(let a=0;a<27;a++)for(let b=0;b<27;b++){const f=dkVerdict(dkCalc(mk(a%12,a,b%12,b))).final;seen[f]=(seen[f]||0)+1}
+     t('Gatekeeper decision: all three outcomes occur across the 27 × 27 star pairs (approved, low score, gatekeeper dosha)',!!seen.APPROVED&&!!seen.REJECTED_LOW_SCORE&&!!seen.REJECTED_GATEKEEPER_DOSHA)}
+    t('Varnadi bidirectional rule: S+A agree; S+B moderate; V+S not; P+P not; S+P not covered',dkVarnadiBi('S','A')==='agree'&&dkVarnadiBi('A','B')==='moderate'&&dkVarnadiBi('V','S')==='not'&&dkVarnadiBi('P','P')==='not'&&dkVarnadiBi('S','P')===null);
+    t('Author rulebook has 17 exceptions (incl. Rajju minor-dosha and Vedha chart-level), a decision rule and the five Varnadi categories',rb.exc.length===17&&rb.decision.gate.join()==='RAJJU,VEDHA'&&Object.keys(rb.varnadi.names).length===5);
+    const vm=rb.varnadi.matrix.split('\n');
+    t('Varnadi matrix: 27 rows × 27 letters, diagonal all Sama (S), only letters S A B P V',vm.length===27&&vm.every((l,i)=>l.length===27&&l[i]==='S'&&/^[SABPV]+$/.test(l)));
+    t('Varnadi matrix: bride Rohini → groom Swati = Bheda and the reverse = Bheda (as in the supplied example)',vm[3][14]==='B'&&vm[14][3]==='B');
+    t('Varnadi matrix is read per direction (not symmetric): Ashwini→Krittika = Prati, Krittika→Ashwini = Sama',vm[0][2]==='P'&&vm[2][0]==='S');
+    V.dk=Object.assign({},DK_DEF,{prof:'anoopam',pts:'w36'});D=dkCalc(mk(11,26,7,17));
+    t('Author 36-point scale (groom Revati / bride Jyeshtha): Mahendra 2 + Stree Deergha 1 (moderate = half of 2) + Yoni 2 (moderate = half of 4) + Rasi Adhipati 5 + Vedha 2 = 12 of 36, benchmark 18 not met',D.tot===12&&D.max===36&&D.bench===18&&D.tot<D.bench);
+    V.dk=Object.assign({},DK_DEF,{prof:'anoopam',pts:'ten'});D=dkCalc(mk(11,26,7,17));
+    t('Author 10-point scale for the same couple: Mahendra 1 + Stree Deergha 0.5 + Yoni 0.5 + Rasi Adhipati 1 + Vedha 1 = 4 of 10',D.tot===4&&D.max===10&&D.bench===6);
+    V.dk=Object.assign({},DK_DEF,{prof:'anoopam'});
+    t('Author scales are stored: weights sum to 10 and 36',Object.values(rb.scales.ten.weights).reduce((a,b)=>a+b,0)===10&&Object.values(rb.scales.w36.weights).reduce((a,b)=>a+b,0)===36);
+    t('Vedha pair list parses completely (15 valid pairs, none unreadable)',dkrbParsePairs(rb.rules.vedha.pairs).pairs.length===15&&!dkrbParsePairs(rb.rules.vedha.pairs).bad.length);
+  }finally{S.ui=oldUi;V.dk=oldV}
+  const ok=res.filter(x=>x.ok).length;return {pass:ok,total:res.length,fail:res.filter(x=>!x.ok).map(x=>x.n)};
+}
+
+function dkSelfTest(){
+  const res=[],t=(n,ok)=>res.push({n,ok:!!ok});
+  t('Rajju groups: 6+6+6+6+3 = 27 stars, each star in exactly one group',[0,1,2,3,4].map(k=>DK_RAJJU_OF.filter(x=>x===k).length).join()==='6,6,6,6,3'&&DK_RAJJU_OF.length===27&&DK_RAJJU_OF.every(x=>x>=0));
+  t('Vedha: every star belongs to a pair; symmetric',[...Array(27).keys()].every(n=>[...Array(27).keys()].some(m=>dkVedha(n,m)))&&dkVedha(0,17)&&dkVedha(17,0)&&!dkVedha(0,18));
+  t('Mrigashira, Chitra and Dhanishta are Vedha to each other',dkVedha(4,13)&&dkVedha(4,22)&&dkVedha(13,22));
+  t('Mahendra counts = 4,7,10,…,25 (8 values)',DK_MAH.length===8&&DK_MAH.every((v,i)=>v===4+3*i));
+  // sample sheet pair: groom Revati (26), bride Jyeshtha (17)
+  const mk=(sb,nb,sg,ng)=>({S:{sb,sg,nb,ng,lb:LORD[sb],lg:LORD[sg]},B:{P:{Moon:{deg:5}}},G:{P:{Moon:{deg:5}}}});
+  const old=V.dk;V.dk=Object.assign({},DK_DEF);
+  let D=dkCalc(mk(11,26,7,17)),g=id=>D.rows.find(r=>r.id===id);
+  t('Sample (groom Revati / bride Jyeshtha): count bride→groom = 10',D.c===10);
+  t('Sample: Mahendra agrees (10 is in the list)',g('MAHENDRA').res==='agree');
+  t('Sample: Stree Deergha does not agree (10 is not above 13)',g('STREE').res==='not');
+  t('Sample: Rajju – both Pada → does not agree',g('RAJJU').res==='not'&&g('RAJJU').boy===g('RAJJU').girl);
+  t('Sample: Vedha agrees (Revati–Jyeshtha is not a pair); Rasi lords Jupiter/Mars agree',g('VEDHA').res==='agree'&&g('RASYA').res==='agree');
+  t('Sample: Gana Deva/Rakshasa does not agree; Dina remainder 1 does not agree under the 2,4,6,8,0 rule',g('GANA').res==='not'&&g('DINA').res==='not');
+  D=dkCalc(mk(0,0,0,1));
+  t('Groom Ashwini / bride Bharani (both Aries): count 27 → Dina remainder 0 agrees; Mahendra 27 no; Rasi same sign agrees',D.c===27&&g('DINA').res==='agree'&&g('MAHENDRA').res==='not'&&g('RASI').res==='agree');
+  D=dkCalc(mk(5,0,0,1));
+  t('Bride Aries / groom Virgo: count 6 → Rasi 6/8 does not agree',g('RASI').res==='not'&&D.cs===6);
+  V.dk=Object.assign({},DK_DEF,{sd:'9'});D=dkCalc(mk(11,26,7,17));
+  t('Stree Deergha ">9" profile: count 10 is moderate',g('STREE').res==='moderate');
+  V.dk=old;
+  const ok=res.filter(x=>x.ok).length;return {pass:ok,total:res.length,fail:res.filter(x=>!x.ok).map(x=>x.n)};
+}
+/* ---- exception library (Dashakoot) ---- */
+const DK_SEC='as cited by a secondary published source; primary text and verse NOT verified in this build';
+function dkR(M,id){return M.dk.rows.find(r=>r.id===id)}
+const DK_EXC=[
+ E('EXC_DK_DINA_001','Dina','No documented Dina exception','No cancellation rule for Dina was found in the sources consulted. The counting direction (bride → groom) is as documented; other directions are not documented.','–','–','No effect','–','RESEARCH PENDING','U','None. Original result stands.',M=>mkNA('RESEARCH PENDING – nothing documented.')),
+ E('EXC_DK_GANA_001','Gana','Rasi lords friendly (or Bhakoot, Yoni, Rasi maitri matches)','Gana Dosha can be ignored when the Rasi lords are friends or when proper Bhakoot, Yoni and Rasi-lord matches exist.','Gana does not agree AND Moon-sign lords mutual friends (or same).','IF Gana ≠ agree ∧ (same lord ∨ mutual friends) THEN softened.','Partial mitigation','Contemporary / blog source','A secondary blog article – '+DK_SEC,'P','Show; keep original Gana result.',
+  M=>dkR(M,'GANA').res==='agree'?mkNA('Gana agrees.'):(M.mutF?mkY('Moon-sign lords '+M.S.lb+' / '+M.S.lg+' are '+(M.same?'the same':'mutual friends')+'.'):((dkR(M,'RASI').res==='agree'&&dkR(M,'YONI').res==='agree')?mkR('Rasi and Yoni agree but the lords are not mutual friends – the source is ambiguous; manual review.'):mkN('Conditions not met.')))),
+ E('EXC_DK_GANA_002','Gana','Groom Rakshasa with friendly lords','A Rakshasa groom with a bride of another Gana is acceptable if friendship (maitri) exists between the Moon-sign lords.','Groom Rakshasa, bride not Rakshasa, lords friendly.','IF groom = Rakshasa ∧ bride ≠ Rakshasa ∧ lords friendly THEN acceptable.','Partial mitigation','Contemporary / blog source','A secondary article – '+DK_SEC,'P','Show; keep original Gana result.',
+  M=>(MK_GANA_OF[M.S.nb]==='R'&&MK_GANA_OF[M.S.ng]!=='R')?(M.mutF||M.mutFN?mkY('Groom Rakshasa, bride '+MK_GANA_NAME[MK_GANA_OF[M.S.ng]]+'; Moon-sign lords not inimical.'):mkN('Lords are inimical.')):mkNA('Groom is not Rakshasa with a bride of another Gana.')),
+ E('EXC_DK_GANA_003','Gana','Same Rashi different Nakshatra / same Nakshatra different Rashi','Gana (and Nadi) Dosha does not apply if the couple share a nakshatra but have different Moon signs, or share a Moon sign but differ in nakshatra.','Gana does not agree AND the pattern matches.','IF Gana ≠ agree ∧ (same sign ∧ different star ∨ same star ∧ different sign) THEN set aside.','Full cancellation','Classical (Jyotirnibandha, as cited)','Jyotirnibandha – '+DK_SEC,'T','Show; keep original Gana result.',
+  M=>dkR(M,'GANA').res==='agree'?mkNA('Gana agrees.'):(((M.sameNak&&!M.sameSign)||(M.sameSign&&!M.sameNak))?mkY(M.sameSign?'Same Moon sign, different stars.':'Same star, different Moon signs.'):mkN('Pattern does not match.'))),
+ E('EXC_DK_GANA_004','Gana','Piyushadhara – friendly lords or satisfactory star compatibility','Gana Dosha is set aside when the Moon-sign lords are mutually friendly or the star (Dina) compatibility is satisfactory.','Gana does not agree AND (lords mutual friends OR Dina agrees).','IF Gana ≠ agree ∧ (mutual friends ∨ Dina = agree) THEN set aside.','Full cancellation','Classical commentary (Piyushadhara, as cited)','Piyushadhara – '+DK_SEC,'T','Show; keep original Gana result.',
+  M=>dkR(M,'GANA').res==='agree'?mkNA('Gana agrees.'):((M.mutF||dkR(M,'DINA').res==='agree')?mkY((M.mutF?'Lords mutually friendly. ':'')+(dkR(M,'DINA').res==='agree'?'Dina agrees.':'')):mkN('Lords not mutually friendly and Dina does not agree.'))),
+ E('EXC_DK_MAH_001','Mahendra','No documented Mahendra exception','None located in the sources consulted. The qualifying counts (4, 7, 10 … 25) are as documented.','–','–','No effect','–','RESEARCH PENDING','U','None.',M=>mkNA('RESEARCH PENDING – nothing documented.')),
+ E('EXC_DK_SD_001','Stree Deergha','Exemption when Rasi and Gana agree','One source states the Stree Deergha requirement is waived when the Rasi and Gana poruthams are obtained.','Stree Deergha does not agree AND Rasi agrees AND Gana agrees.','IF Stree ≠ agree ∧ Rasi = agree ∧ Gana = agree THEN exempt.','Partial mitigation','Regional practice (single source)','vedicbirth.com – single secondary source; not corroborated','U','Show for manual review; keep original result.',
+  M=>dkR(M,'STREE').res==='agree'?mkNA('Stree Deergha agrees.'):((dkR(M,'RASI').res==='agree'&&dkR(M,'GANA').res==='agree')?mkR('Rasi and Gana both agree. Single-source exemption – manual review.'):mkN('Rasi and Gana do not both agree.'))),
+ E('EXC_DK_SD_002','Stree Deergha','Alternative thresholds','Besides "above 13" (full), some astrologers accept a count above 9 as moderate, and one source requires only 8 or more.','Always evaluated.','Re-evaluate the count under each documented threshold.','Alternative traditional rule','Regional practice','hindutone.com; vedicbirth.com – secondary','R','Show the alternative results; the selected profile decides the original result.',
+  M=>{const c=M.dk.c;return mkR(`Count ${c}: above 13 → ${c>13?'agrees':'no'}; above 9 → ${c>13?'agrees':c>9?'moderate':'no'}; 8 or more → ${c>=8?'agrees':'no'}.`)}),
+ E('EXC_DK_YONI_001','Yoni','No Dashakoot-specific Yoni exception','The sources give only “identical or friendly agree, hostile do not”. No cancellation rule located.','–','–','No effect','–','RESEARCH PENDING','U','None.',M=>mkNA('RESEARCH PENDING – nothing documented.')),
+ E('EXC_DK_RASI_001','Rasi','Sign lords the same or friendly','Rasi Porutham exceptions apply when the Moon-sign lords are the same planet or friends.','Rasi does not agree AND lords same or mutual friends.','IF Rasi ≠ agree ∧ (same lord ∨ mutual friends) THEN exception applies.','Partial mitigation','Traditional (secondary source)','hindutone.com – secondary; '+DK_SEC,'T','Show; keep original Rasi result.',
+  M=>dkR(M,'RASI').res==='agree'?mkNA('Rasi agrees.'):((M.same||M.mutF)?mkY('Lords '+M.S.lb+' / '+M.S.lg+' are '+(M.same?'the same':'mutual friends')+'.'):mkN('Lords are not the same or mutually friendly.'))),
+ E('EXC_DK_RASI_002','Rasi','6/8 with identical or friendly sign lords','The 6/8 relationship is not harmful when the two sign lords are identical or friendly (the cited pairs are those whose lords are the same or friends).','Count 6 or 8 AND lords identical or mutually friendly.','IF 6/8 ∧ (same lord ∨ mutual friends) THEN auspicious.','Full cancellation','Classical (Muhurta Pradipa, as cited)','Muhurta Pradipa – '+DK_SEC,'T','Show; keep original Rasi result.',
+  M=>(M.dk.cs===6||M.dk.cs===8)?((M.same||M.mutF)?mkY('6/8 with '+(M.same?'identical':'mutually friendly')+' lords.'):mkN('Lords not identical or mutually friendly.')):mkNA('Not a 6/8 relationship.')),
+ E('EXC_DK_RASI_003','Rasi','2/12 with friendly lords','The 2/12 relationship does not apply when the sign lords are mutually friendly or one sign is naturally drawn to the other.','Count 2 or 12 AND lords mutually friendly or same.','IF 2/12 ∧ (same ∨ mutual friends) THEN not applied.','Full cancellation','Classical (Kala Prakasika, as cited)','Kala Prakasika – '+DK_SEC,'T','Show; keep original Rasi result.',
+  M=>(M.dk.cs===2||M.dk.cs===12)?((M.same||M.mutF)?mkY('2/12 with '+(M.same?'identical':'mutually friendly')+' lords.'):mkN('Lords not mutually friendly.')):mkNA('Not a 2/12 relationship.')),
+ E('EXC_DK_RASI_004','Rasi','5/9 – bride\'s sign 9th from the groom\'s','A 5/9 relationship is called auspicious when the bride\'s sign is the 9th from the groom\'s; the reverse is called harmful to progeny.','Signs in a 5/9 relationship.','IF bride\'s sign is 9th from groom\'s THEN favourable; IF 5th THEN adverse note.','Partial mitigation','Classical (Jyotih Prakasam, as cited, single source)','Jyotih Prakasam – '+DK_SEC,'U','Manual review only.',
+  M=>{const a=((M.S.sg-M.S.sb+12)%12)+1;return (a===9||a===5)?mkR('Bride\'s sign is the '+a+'th from the groom\'s. Single-source rule – manual review.'):mkNA('Not a 5/9 relationship.')}),
+ E('EXC_DK_RA_001','Rasi Adhipati','One-sided enmity of lords','The source covers friends, neutral and mutual enemies only; a friend/neutral with an enemy is not specified.','Lords friend–enemy or neutral–enemy.','–','Alternative traditional rule','Gap in sources','hindutone.com – silent','U','Flag for manual review.',
+  M=>{const a=dkR(M,'RASYA');return (a.r1==='Enemy'&&a.r2!=='Enemy')||(a.r2==='Enemy'&&a.r1!=='Enemy')?mkR('One-sided enmity ('+a.r1+' / '+a.r2+') – the source gives no rule; shown as moderate.'):mkNA('No one-sided enmity.')}),
+ E('EXC_DK_VAS_001','Vashya','Dashakoot Vasya sign table','The Vasya table used in the Dashakoot tradition is not reproduced in the sources consulted. The Ashtakoot Vashya table is not assumed to apply.','–','–','No effect','–','RESEARCH PENDING','U','Vasya stays "RESEARCH PENDING" unless the borrowed-table preference is chosen.',M=>mkNA('RESEARCH PENDING – table not available.')),
+ E('EXC_DK_VAS_002','Vashya','Borrowed Ashtakoot Vashya table (comparison)','Shows what the Ashtakoot Vashya table would give, for comparison only.','Always evaluated.','Look up the Ashtakoot Vashya matrix.','Alternative traditional rule','Borrowed – applicability not verified','Ashtakoot library (secondary)','U','Show for comparison only unless selected in the preferences.',
+  M=>{const cb=mkVashya(M.S.sb,M.B.P.Moon.deg),cg=mkVashya(M.S.sg,M.G.P.Moon.deg);return mkR('Ashtakoot Vashya table: '+MK_VASHYA_CLS[cb]+' / '+MK_VASHYA_CLS[cg]+' = '+MK_VASHYA_M[cg][cb]+'/2 (comparison only).')}),
+ E('EXC_DK_RAJ_001','Rajju','Mitigating factors judged by an experienced astrologer','Same-Rajju is usually treated as a reason not to proceed “unless an experienced astrologer finds mitigating factors”. No specific cancellation rule is documented.','Rajju Dosha formed.','–','Alternative traditional rule','Practice (no specific rule)','hindutone.com – secondary','U','Manual review; no automatic cancellation.',
+  M=>dkR(M,'RAJJU').res==='not'?mkR('Both stars are in the '+dkR(M,'RAJJU').boy+' rajju. No documented cancellation rule – manual review.'):mkNA('Rajju Dosha is not formed.')),
+ E('EXC_DK_RAJ_002','Rajju','Ascending / descending (aroha–avaroha) direction','Some practice distinguishes rajju stars by ascending or descending direction. The assignment of stars is not in the sources consulted.','–','–','No effect','–','RESEARCH PENDING','U','Not applied.',M=>mkNA('RESEARCH PENDING – not documented in the sources consulted.')),
+ E('EXC_DK_VED_001','Vedha','No documented Vedha exception','No cancellation rule for Vedha was found in the sources consulted.','–','–','No effect','–','RESEARCH PENDING','U','None.',M=>mkNA('RESEARCH PENDING – nothing documented.')),
+ E('EXC_DK_VP_001','Varnadi Panchaka','Varnadi Panchaka rules','The five components and their rules were not found in any source consulted.','–','–','No effect','–','RESEARCH PENDING','U','Module disabled except the optional provisional profile.',M=>mkNA('RESEARCH PENDING.'))
+].concat(MK_EXC.filter(r=>r.cat==='Mangal'||(r.cat==='General'&&!['EXC_GEN_001','EXC_GEN_002'].includes(r.id))));
+const DK_CATS=[['all','All Exception Rules'],['Dina','Dina'],['Gana','Gana'],['Mahendra','Mahendra'],['Stree Deergha','Stree Deergha'],['Yoni','Yoni'],['Rasi','Rasi'],['Rasi Adhipati','Rasi Adhipati'],['Vashya','Vashya'],['Rajju','Rajju Dosha'],['Vedha','Vedha'],['Varnadi Panchaka','Varnadi Panchaka'],['Mangal','Mangal Dosha'],['General','General Marriage Compatibility']];
+function dkSummary(M){
+  const D=M.dk,ev=dkAllExc().map(r=>({r,res:r.test(M)})),catOf={DINA:'Dina',GANA:'Gana',MAHENDRA:'Mahendra',STREE:'Stree Deergha',YONI:'Yoni',RASI:'Rasi',RASYA:'Rasi Adhipati',VASYA:'Vashya',RAJJU:'Rajju',VEDHA:'Vedha'};
+  const rank=e=>MK_EFF.indexOf(e),idf=x=>x.r.id.replace('EXC_','');
+  const mk=(label,orig,formed,cat)=>{const yes=ev.filter(x=>x.r.cat===cat&&x.res.st==='yes'),rev=ev.filter(x=>x.r.cat===cat&&x.res.st==='review');
+    let eff='—',final;if(yes.length)eff=yes.map(x=>x.r.effect).sort((a,b)=>rank(a)-rank(b))[0];
+    const ids=[...yes.map(idf),...rev.map(x=>idf(x)+' (review)')].join(', ')||'—';
+    if(!formed)final='Agrees / no issue – original result stands';
+    else if(yes.length)final=(eff==='Full cancellation'?'Does not agree; cancellation recognised under the selected (traditional) reading – result NOT changed':eff==='Partial mitigation'?'Does not agree; partly mitigated – result NOT changed':'Does not agree; interpretation modified – result NOT changed')+(rev.length?' · further rules need manual review':'');
+    else if(rev.length)final='Does not agree; exception(s) need manual review: '+rev.map(idf).join(', ');
+    else final='Does not agree; no applicable exception found – it stands';
+    return {label,orig,ids,eff,final}};
+  const rows=D.rows.map(r=>mk(r.name,dkRes[r.res][0]+(r.pts!==null?' ('+r.pts+'/'+r.max+')':''),r.res==='not'||r.res==='moderate',catOf[r.id]));
+  rows.push(mk('Mangal','Boy: '+(M.mg.B.any?'formed':'not formed')+' · Girl: '+(M.mg.G.any?'formed':'not formed'),M.mg.B.any||M.mg.G.any,'Mangal'));
+  return {ev,rows};
+}
+/* ---- page ---- */
+const DK_TABS=[['dk','Dashakoot'],['vp','Varnadi Panchaka'],['pl','Planetary details'],['ch','Charts'],['da','Dasha comparison'],['do','Dosha analysis'],['ex','Exception library'],['su','Summary'],['rb','Rulebook – Anoopam Shukla'],['re','Final report']];
+function dkPrefs(){
+  const P=dks(),sel=(k,arr)=>`<select onchange="dkSet('${k}',this.value)">${opt(arr,P[k])}</select>`,lbl=(t,h)=>`<label style="margin:0">${t}<br>${h}</label>`;
+  const prof=[['south','Common South Indian Dasa Porutham (qualitative, secondary sources)'],['anoopam',(dkrb()?dkrb().name+' v'+dkrb().version+' (author-defined)':'Anoopam Shukla Rulebook – create it in the Rulebook tab')],['kala','Kalaprakasika paddhati – RESEARCH PENDING (disabled)']];
+  const pr=`<select onchange="dkSet('prof',this.value)">${prof.map(([v,l])=>`<option value="${v}"${(v==='south'||(v==='anoopam'&&dkrb()))?'':' disabled'}${P.prof===v?' selected':''}>${esc(l)}</option>`).join('')}</select>`;
+  return `<div class="card noprint"><b>Preferences</b><div class="row" style="align-items:flex-end;gap:10px 16px;margin-top:6px">
+   ${lbl('Calculation tradition / rule profile',pr)}
+   ${lbl('Points display',sel('pts',[['none','No points – qualitative (as documented)'],['sample44','Sample-sheet layout: max points 3,6,2,2,4,7,5,2,8,2 (full / half / zero)'],['ten','Author 10-point scale (1 per porutham; Madhyama 0.5)'],['w36','Author weighted 36-point scale (benchmark 18)'],['rulebook','Author rulebook custom point values (if entered)']]))}
+   ${lbl('Life-area wording',sel('area',[['trad','Traditional significance'],['sheet','Sample-sheet life areas (Hindi layout)']]))}
+   ${lbl('Stree Deergha threshold',sel('sd',[['13','Above 13 (most common)'],['9','Above 13 full, above 9 moderate'],['8','8 or more (one source)']]))}
+   ${lbl('Yoni classification',sel('yoni',[['matrix','Ashtakoot yoni table (borrowed)'],['enemy','Enemy pairs only']]))}
+   ${lbl('Vasya',sel('vas',[['pending','Not evaluated – RESEARCH PENDING'],['borrowed','Borrow the Ashtakoot Vashya table (unverified)']]))}
+   ${lbl('Poruthams that should agree',sel('min',[['5','At least 5 (documented)'],['6','At least 6 (documented)'],['7','At least 7 (documented)']]))}
+   ${lbl('Varnadi Panchaka',sel('vp',[['pending','RESEARCH PENDING – not calculated'],['prov','Provisional: first five Ashtakoot kootas (an assumption)']]))}
+   <button class="sm" onclick="dkReset()">Reset preferences</button></div>
+   <p class="mute" style="margin:6px 0 0">Ayanamsa, node and house settings are taken from each horoscope (change them in the horoscope). Chart style follows the setting at the top. Rajju and Vedha are shown separately because they are treated as the critical poruthams.</p></div>`;
+}
+function vDash(){
+  const cs=S.charts;
+  const head=`<div class="card" style="border-top:4px solid #c9a227"><h2 style="margin:0 0 2px">ASTROSUTRAS – DASHAKOOT MILAN</h2><div class="mute">South Indian ten Poruthams · Varnadi Panchaka · D1 / Moon / D9 · Dasha · Dosha analysis · Exception library</div></div>`;
+  if(cs.length<2)return head+'<div class="card">Add at least two horoscopes first (Birth Details › New Chart), then return here to match them.</div>';
+  if(!cs.find(c=>c.id===V.mb))V.mb=cs[0].id;
+  if(!cs.find(c=>c.id===V.mg)||V.mg===V.mb)V.mg=(cs.find(c=>c.id!==V.mb)||cs[0]).id;
+  if(!dkrb()&&!(S.ui&&S.ui.dkrbAuto)){const rb0=dkrbBuild('author');dkrbSave(rb0);S.ui.dkrbAuto=1;const P0=dks();P0.prof='anoopam';S.ui.dk=Object.assign({},P0);save()}
+  {const rbx=dkrb();if(rbx&&rbx.varnadi&&rbx.varnadi.names&&!String(rbx.varnadi.matrix||'').trim()&&!rbx.matrixLoaded){rbx.varnadi.matrix=DKRB_VARNADI_MATRIX;rbx.matrixLoaded=1;rbx.notes=(rbx.notes||'')+'\n8. The Varnadi Panchaka 27 × 27 matrix supplied by the author was loaded on '+new Date().toISOString().slice(0,10)+' (row = the bride\'s star, column = the groom\'s star; not symmetric; source not verified).';dkrbSave(rbx)}}
+  {const rbx=dkrb();if(rbx&&rbx.rules&&rbx.rules.gana&&rbx.varnadi&&rbx.varnadi.names&&!rbx.jsonUpdate1){const R0=rbx.rules;let ch=[];
+    if(R0.gana[0]&&R0.gana[0][2]==='not'){R0.gana[0][2]='moderate';ch.push('Gana bride Deva + groom Rakshasa = moderate')}
+    if(R0.gana[1]&&R0.gana[1][2]===''){R0.gana[1][2]='not';ch.push('Gana bride Manushya + groom Rakshasa = does not agree')}
+    if(R0.rasya&&R0.rasya.FE===''){R0.rasya.FE='not';ch.push('Rasi lords friend+enemy = does not agree')}
+    if(R0.rasya&&R0.rasya.NE===''){R0.rasya.NE='not';ch.push('Rasi lords neutral+enemy = does not agree')}
+    if(rbx.decision&&rbx.decision.modPass===undefined){rbx.decision.modPass='yes';ch.push('Madhyama counts as a pass in the decision rule')}
+    rbx.jsonUpdate1=1;if(ch.length)rbx.notes=(rbx.notes||'')+'\n9. Updated on '+new Date().toISOString().slice(0,10)+' from the later JSON and implementation notes supplied by the author: '+ch.join('; ')+'.';dkrbSave(rbx)}}
+  {const rbx=dkrb();if(rbx&&rbx.rules&&rbx.varnadi&&rbx.varnadi.names&&!rbx.scales){rbx.scales=JSON.parse(JSON.stringify(DKRB_SCALES_AUTHOR));rbx.notes=(rbx.notes||'')+'\n10. The 10-point and weighted 36-point scales supplied by the author were loaded on '+new Date().toISOString().slice(0,10)+' (choose one under Preferences › Points display). Exceptions never change a result, so the half points the text gives for exception cases are not awarded.';dkrbSave(rbx)}}
+  {const rbx=dkrb();if(rbx&&rbx.rules&&rbx.decision&&rbx.decision.gate&&rbx.varnadi&&rbx.varnadi.names&&!rbx.jsonUpdate3){const ch=[];
+    if(rbx.nak&&rbx.nak[0]&&rbx.nak[0].dir===undefined){rbx.nak.forEach((e,i)=>e.dir=DKRB_RAJJU_DIR_AUTH[i]);ch.push('Rajju direction (Aroha / Avaroha / Siro) of each star')}
+    if(rbx.rules.rajju&&rbx.rules.rajju.opp===undefined){rbx.rules.rajju={same:rbx.rules.rajju.same||'not',siro:'not',opp:'moderate',sameDir:'not',exc:'yes'};ch.push('Rajju rules: Siro hard reject, opposite directions soft pass, same direction hard reject')}
+    const fresh=dkrbBuild('author');rbx.exc=rbx.exc||[];fresh.exc.filter(e=>['AS_EXC_016','AS_EXC_017'].includes(e.id)&&!rbx.exc.some(x=>x.id===e.id)).forEach(e=>{rbx.exc.push(e);ch.push('exception '+e.id)});
+    rbx.jsonUpdate3=1;if(ch.length)rbx.notes=(rbx.notes||'')+'\n11. Updated on '+new Date().toISOString().slice(0,10)+' from the author\'s gatekeeper rules: '+ch.join('; ')+'. The decision order is Rajju → Vedha → threshold (REJECTED_GATEKEEPER_DOSHA / APPROVED / REJECTED_LOW_SCORE). Varnadi bidirectional rule: Uttama = both directions Sama or Sadhaka; Madhyama = one direction Sama or Sadhaka and the other Bheda; Adhama = either direction Vadha or both Prati; other combinations are reported as not covered.';dkrbSave(rbx)}}
+  const cB=cs.find(c=>c.id===V.mb),cG=cs.find(c=>c.id===V.mg),M=milanCalc(cB,cG);M.dk=dkCalc(M);
+  const D=M.dk,VD=dkVerdict(D),tab=V.dkt||'dk',diff=['ay','ayCustom','node','hs','vm'].some(k=>(cB[k]||'')!==(cG[k]||''));
+  const body={dk:dkMain,vp:dkVpTab,rb:dkRbTab,pl:mlPl,ch:mlCh,da:mlDa,do:dkDo,ex:dkEx,su:dkSu,re:dkRe}[tab](M);
+  const P=dks();
+  return head+`<div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(300px,1fr));margin-bottom:14px">${mlPanel('BOY / GROOM',cB,'mb')}${mlPanel('GIRL / BRIDE',cG,'mg')}</div>
+   <div class="card noprint"><div class="row"><button class="pri" onclick="render()">CALCULATE MATCH</button><button onclick="const t=V.mb;V.mb=V.mg;V.mg=t;render()">⇄ Swap boy / girl</button><button onclick="V.mb=null;V.mg=null;V.dkt='dk';render()">CLEAR</button><button onclick="V.bd='new';go('birth')">＋ New horoscope</button>
+    <span style="margin-left:auto" class="mute">Chart style: <b>${V.style==='south'?'South':'North'} Indian</b></span></div>
+    ${diff?'<p class="bad" style="margin:8px 0 0"><b>Different calculation settings</b> (ayanamsa / node / house system) are used for the two horoscopes. For matching, both should use the same profile.</p>':''}
+    ${cB.id===cG.id?'<p class="bad" style="margin:8px 0 0">The same horoscope is selected for both partners.</p>':''}</div>
+   ${dkPrefs()}
+   <div class="card" style="text-align:center;border-top:4px solid #c9a227"><div class="mute">DASHAKOOT RESULT (original traditional result)</div>
+    <div style="font-size:40px;font-weight:800;color:#a8841a;line-height:1.1">${D.agree} <span style="font-size:20px">of ${10-D.pend} agree</span></div>
+    <div class="row" style="justify-content:center;margin-top:4px"><span class="tag ok">${D.agree} ${dkRes.agree[0]}</span><span class="tag warn">${D.mod} ${dkRes.moderate[0]}</span><span class="tag bad">${D.not} ${dkRes.not[0]}</span>${D.pend?`<span class="tag">${D.pend} ${DK_PEND}</span>`:''}</div>
+    <div class="mute" style="margin-top:6px">Selected minimum: ${D.need} poruthams agreeing – <b class="${D.met?'ok':'bad'}">${D.met?'met':'not met'}</b> · Rajju: <b class="${D.rajju==='agree'?'ok':'bad'}">${dkRes[D.rajju][0]}</b> · Vedha: <b class="${D.vedha==='agree'?'ok':'bad'}">${dkRes[D.vedha][0]}</b>${D.tot!==null?' · '+(D.scaleName||(dks().pts==='sample44'?'Sample-sheet points':'Rulebook points'))+': <b>'+D.tot+' / '+D.max+'</b>'+(D.bench!==null?' – benchmark '+D.bench+' '+(D.tot>=D.bench?'<span class="ok">met</span>':'<span class="bad">not met</span>'):''):''}</div>
+    <div style="margin-top:6px;font-size:13px"><b>Rule profile:</b> ${esc(D.profile)}${D.author?' <span class="tag">author-defined</span>':''}</div>
+    ${VD?`<div style="margin-top:4px;font-size:14px"><b>Verdict by the author's decision rule:</b> <span class="${VD.gateOk&&VD.coreOk&&VD.n>=VD.d.good?'ok':'bad'}">${esc(VD.verdict)}</span><div class="mute" style="font-size:12px">Gatekeeper decision (Rajju → Vedha → threshold ≥ ${VD.thr}): <b>${VD.final}</b>${VD.siro?' – Siro rajju: absolute rejection':''} · Gatekeepers: ${VD.gate.map(x=>x.id+' – '+x.res).join(' · ')} · Core pillars agreeing: ${VD.coreN} of ${VD.core.length} (need ${VD.d.coreMin}) · Essential five ${VD.panchaOk?'all agree':'not all agree'}</div></div>`:''}
+    <div class="mute" style="font-size:12px">No single score out of 36 or 100 is created: the poruthams are reported as in the South Indian tradition (agree / moderate / do not agree). Exceptions never change this result.</div></div>
+   <div class="card noprint" style="padding:8px 14px"><div class="row">${DK_TABS.map(([k,l])=>`<button class="${tab===k?'on':''}" onclick="V.dkt='${k}';render()">${l}</button>`).join('')}</div></div>`+body;
+}
+function dkTable(M){
+  const D=M.dk,P=dks(),pts=P.pts!=='none';
+  const rows=D.rows.map(r=>{const rs=dkRes[r.res];return `<tr><td>${r.no}</td><td><details><summary><b>${r.name}</b> <span class="mute" translate="no">${r.hi}</span></summary><div class="mute" style="margin:4px 0">${esc(r.tamil)} – ${esc(r.what)}</div><div style="font-size:13px">${esc(r.calc)}</div></details></td><td translate="no">${esc(r.boy)}</td><td translate="no">${esc(r.girl)}</td>${pts?`<td>${r.max}</td><td><b>${r.pts===null?'–':r.pts}</b></td>`:''}<td><span class="tag ${rs[1]}">${rs[0]}</span></td><td class="mute">${esc(r.area)}</td></tr>`}).join('');
+  const other=`<tr style="background:var(--acc2)"><td colspan="${pts?8:6}"><b>Other considerations</b> <span class="mute">(shown in the sample sheet)</span></td></tr>
+   <tr><td></td><td>Varna / Jati of Moon sign</td><td>${MK_VN[M.S.vb]}</td><td>${MK_VN[M.S.vg]}</td>${pts?'<td>1</td><td>–</td>':''}<td><span class="tag">${M.S.vb===M.S.vg?'Same':'Information'}</span></td><td class="mute">Taken from the Moon sign (same as Ashtakoot Varna)</td></tr>
+   <tr><td></td><td>Purusha / Stree nakshatra</td><td>–</td><td>–</td>${pts?'<td>1</td><td>–</td>':''}<td><span class="tag">${DK_PEND}</span></td><td class="mute">Classification not documented in the sources consulted</td></tr>
+   <tr><td></td><td>Gotra</td><td>–</td><td>–</td>${pts?'<td>1</td><td>–</td>':''}<td><span class="tag">${DK_PEND}</span></td><td class="mute">Needs gotra / nakshatra-gotra data – not available</td></tr>`;
+  const tot=pts?`<tr style="background:var(--acc2)"><td></td><td><b>TOTAL (ten poruthams)</b></td><td></td><td></td><td>${D.max}</td><td><b>${D.tot}</b></td><td colspan="2" class="mute">Display convention modelled on the sample sheet – not a classical score</td></tr>`:'';
+  return `<div style="overflow-x:auto"><table><tr><th>No.</th><th>Koota</th><th>Boy</th><th>Girl</th>${pts?'<th>Max</th><th>Obtained</th>':''}<th>Result</th><th>Life area</th></tr>${rows}${tot}${other}</table></div>`;
+}
+function dkMain(M){
+  const D=M.dk,P=dks();
+  return `<div class="card"><h3 style="margin-top:0">Dashakoot – ten Poruthams (original traditional result)</h3><p class="mute" style="margin-top:0">Click a koota to see how it was calculated. Boy: Moon in <b translate="no">${SIGNS[M.S.sb]}, ${NAKS[M.S.nb]}-${M.B.P.Moon.pada}</b> · Girl: Moon in <b translate="no">${SIGNS[M.S.sg]}, ${NAKS[M.S.ng]}-${M.G.P.Moon.pada}</b>. Counting: bride's star = 1, counted forward to the groom's star (=${D.c}).</p>${dkTable(M)}
+   ${P.pts!=='none'?'<p class="mute" style="margin-bottom:0">Points: maximum values are those of your sample sheet. Obtained = full when the porutham agrees, half when moderate, zero when not. The sample sheet\'s own awarding rules (for example partial points for Dina or Rajju) are not available, so some values will differ from it.</p>':''}
+   <p class="mute" style="margin-bottom:0">Source status: rules as documented by secondary sources; Vasya, Rajju direction, the Kalaprakasika paddhati and Varnadi Panchaka are ${DK_PEND}. Primary Sanskrit texts have not been verified.</p></div>`;
+}
+function dkVp(M){
+  const P=dks(),K=M.k;
+  const prov=P.vp==='prov';
+  const names=['Varna','Vashya','Tara','Yoni','Graha Maitri'],ids=['VARNA','VASHYA','TARA','YONI','GRAHA'];
+  const rows=names.map((n,i)=>{const k=K[ids[i]];return prov?`<tr><td>${i+1}</td><td><b>${n}</b> <span class="tag">PROVISIONAL</span></td><td translate="no">${esc(k.boy)}</td><td translate="no">${esc(k.girl)}</td><td>${k.pts}/${k.max} (Ashtakoot points)</td><td class="mute">${k.pts===k.max?'full':k.pts===0?'none':'partial'}</td></tr>`:`<tr><td>${i+1}</td><td>Panchaka ${i+1}</td><td>–</td><td>–</td><td><span class="tag">${DK_PEND}</span></td><td class="mute">Verified traditional name not available</td></tr>`}).join('');
+  return `<div class="card"><h3 style="margin-top:0">Varnadi Panchaka (वर्णादि पंचक)</h3>
+   <p><b>${DK_PEND}.</b> No source consulted defines the five components of Varnadi Panchaka, their calculation, or whether they belong to the Dashakoota tradition. Following your instruction, the five components have not been assumed and no Panchaka result is calculated.</p>
+   <p class="mute">If “Varnadi” means “the group beginning with Varna”, the first five Ashtakoot kootas (Varna, Vashya, Tara, Yoni, Graha Maitri) are the likely candidate. That is an assumption about the name, not a verified definition, so it is offered only as a clearly marked <b>provisional</b> profile in the Preferences (“Varnadi Panchaka”). Please send the reference that defines the five components to replace it.</p>
+   <div style="overflow-x:auto"><table><tr><th>#</th><th>Component</th><th>Boy</th><th>Girl</th><th>Relationship / result</th><th>Note</th></tr>${rows}</table></div>
+   <p class="mute" style="margin-bottom:0">Varnadi Panchaka is kept separate from the Dashakoot result.${prov?' The provisional rows reuse the Ashtakoot calculations unchanged.':''}</p></div>`;
+}
+function dkDo(M){
+  const D=M.dk,ev=dkAllExc().map(r=>({r,res:r.test(M)})),ids=(cat,st)=>ev.filter(x=>x.r.cat===cat&&x.res.st===st).map(x=>`<span class="tag">${x.r.id.replace('EXC_','')}</span> ${esc(x.r.name)} – ${esc(x.res.why)}`);
+  mlDo(M);
+  const card=(title,formed,sev,rule,cat,extra)=>{const y=ids(cat,'yes'),r=ids(cat,'review');return mlCard(title,formed?'Formed':'Not formed',formed?sev:'',[['Rule responsible',rule],['Cancellation conditions examined',(y.length?'<b>Applicable:</b><br>'+y.join('<br>'):'None applicable')+(r.length?'<br><b>Manual review:</b><br>'+r.join('<br>'):'')],['Cancellation confirmed?',!formed?'–':y.length?'Recognised under the readings above (result unchanged); sources are secondary and not verified':'No'],['Remaining concerns',formed?(extra||'The original result stands.'):'–']],formed?(y.length?'warn':'bad'):'ok')};
+  const rj=D.rows.find(r=>r.id==='RAJJU'),vd=D.rows.find(r=>r.id==='VEDHA'),rs=D.rows.find(r=>r.id==='RASI');
+  return card('Rajju Dosha',rj.res==='not','critical in South Indian tradition','Both stars in the same rajju ('+rj.boy+' / '+rj.girl+')'+(rj.boy===rj.girl&&rj.res==='not'?' – '+(DKRB_RAJJU_SEV[[0,1,2,3,4].findIndex(i=>rbRajjuName(i)===rj.boy)]||'severity per rulebook'):'')+'. The traditional reading concerns marital stability and longevity and is treated with great caution – never as a prediction.','Rajju')
+   +card('Vedha',vd.res==='not','critical in South Indian tradition','The two stars form a Vedha pair ('+vd.boy+' / '+vd.girl+').','Vedha')
+   +card('Rasi 6/8 (Shashtashtaka)',rs.res==='not'&&(rs.cs===6||rs.cs===8),'Rasi porutham','Count from bride\'s sign to groom\'s is '+rs.cs+' (6 or 8).','Rasi')
+   +(M._mangal||'')+(M._other||'')
+   +`<div class="card"><p class="mute" style="margin:0">Original results are shown exactly as calculated; exceptions are listed with their source status and never change a porutham result. Most rules recorded here are traditional or regional readings cited by secondary sources and have not been checked against the primary texts.</p></div>`;
+}
+function dkEx(M){
+  const P=dks(),cat=P.ex||'all',view=P.exview,fil=P.exfil,S1=dkSummary(M);
+  const badge=st=>st==='yes'?'<span class="tag ok">Applicable</span>':st==='review'?'<span class="tag warn">Manual review</span>':'<span class="tag">Not applicable</span>';
+  let list=S1.ev.filter(x=>cat==='all'||x.r.cat===cat);
+  if(view==='match')list=list.filter(x=>x.res.st==='yes'||x.res.st==='review');
+  list=list.filter(x=>fil==='all'||(fil==='app'&&x.res.st==='yes')||(fil==='napp'&&(x.res.st==='no'||x.res.st==='na'))||(fil==='full'&&x.r.effect==='Full cancellation')||(fil==='part'&&x.r.effect==='Partial mitigation')||(fil==='unv'&&x.r.conf==='U')||(fil==='rev'&&x.res.st==='review'));
+  const item=({r,res})=>`<details class="card" style="margin:0 0 8px;padding:8px 12px"><summary><b>${r.id}</b> · ${esc(r.name)} ${badge(res.st)} <span class="tag">${r.effect}</span> <span class="tag" title="Source hierarchy ${MKC[r.conf][1]}">${MKC[r.conf][0]}</span></summary>
+    <table style="margin-top:6px;font-size:13px"><tr><td class="mute" style="width:170px">Category</td><td>${r.cat}</td></tr><tr><td class="mute">Definition</td><td>${esc(r.def)}</td></tr><tr><td class="mute">Applicable conditions</td><td>${esc(r.cond)}</td></tr><tr><td class="mute">Formation logic</td><td>${esc(r.logic)}</td></tr><tr><td class="mute">Effect</td><td>${r.effect}</td></tr><tr><td class="mute">Applicable tradition</td><td>${esc(r.trad)}</td></tr><tr><td class="mute">Source</td><td>${esc(r.ref)}</td></tr><tr><td class="mute">Confidence</td><td>${MKC[r.conf][0]} (hierarchy ${MKC[r.conf][1]})</td></tr><tr><td class="mute">Software action</td><td>${esc(r.action)}</td></tr><tr><td class="mute"><b>Result for this match</b></td><td><b>${esc(res.why)}</b></td></tr></table></details>`;
+  const sum=S1.rows.map(r=>`<tr><td><b>${r.label}</b></td><td>${esc(r.orig)}</td><td>${esc(r.ids)}</td><td>${r.eff}</td><td>${esc(r.final)}</td></tr>`).join('');
+  return `<div class="card"><h3 style="margin-top:0">Exception library</h3><p class="mute" style="margin-top:0"><b>Identify first. Check exceptions second. Interpret third.</b> The original porutham results are never hidden or changed. Rules are recorded as documented by secondary sources; none is labelled “Verified”.</p>
+   <div class="row"><label style="display:inline;margin:0">Category <select onchange="dkSet('ex',this.value)">${opt(DK_CATS,cat)}</select></label>
+    <label style="display:inline;margin:0">View <select onchange="dkSet('exview',this.value)">${opt([['lib','Complete rule library'],['match','Applicable to this match']],view)}</select></label>
+    <label style="display:inline;margin:0">Filter <select onchange="dkSet('exfil',this.value)">${opt([['all','All rules'],['app','Applicable rules'],['napp','Not applicable'],['full','Full cancellation'],['part','Partial mitigation'],['unv','Unverified rules'],['rev','Requires manual review']],fil)}</select></label><span class="mute" style="margin-left:auto">${list.length} rule(s)</span></div></div>
+   <div class="card"><h3 style="margin-top:0">Original result vs result after applicable exception rules</h3><div style="overflow-x:auto"><table><tr><th>Koota / Dosha</th><th>Original status (unchanged)</th><th>Exception found</th><th>Effect</th><th>Final status</th></tr>${sum}</table></div></div>
+   ${list.map(item).join('')||'<div class="card mute">No rules match the current category / filter.</div>'}`;
+}
+function dkSu(M){
+  const D=M.dk,S1=dkSummary(M),VD=dkVerdict(D),rows=D.rows,okR=rows.filter(r=>r.res==='agree').map(r=>r.name),badR=rows.filter(r=>r.res==='not').map(r=>r.name),mdR=rows.filter(r=>r.res==='moderate').map(r=>r.name);
+  const D1=mlD1Rows(M),D9=mlD9Rows(M),ds=Date.now(),dB=dashaAt(M.B,ds),dG=dashaAt(M.G,ds);
+  const pos=[],neg=[];['B','G'].forEach(x=>{const w=x==='B'?'Boy':'Girl',Y=x==='B'?M.yB:M.yG;[['YOG_VIVAHA',1],['YOG_VIVAHA_OBSTRUCTION',0],['YOG_MANGALDOSHA',0],['YOG_VISH',0]].forEach(([i,g])=>{const r=Y.recs.find(z=>z.id===i);if(r&&r.formed)(g?pos:neg).push(w+': '+r.name+(r.cancelled?' (cancelled)':''))})});
+  if(D.rajju==='not')neg.push('Rajju Dosha (same rajju)');if(D.vedha==='not')neg.push('Vedha pair');
+  const canc=S1.ev.filter(x=>x.res.st==='yes'&&x.r.cat!=='General').map(x=>x.r.id.replace('EXC_','')+' – '+x.r.name);
+  const li=a=>a.length?'<ul style="margin:4px 0 0 18px">'+a.map(x=>`<li>${esc(x)}</li>`).join('')+'</ul>':'<span class="mute">none identified</span>';
+  const sec=(n,t,b)=>`<tr><td style="width:36px" class="mute">${n}</td><td style="width:230px"><b>${t}</b></td><td>${b}</td></tr>`;
+  const conc=`Under the selected profile ${D.agree} of the ${10-D.pend} evaluated poruthams agree${D.mod?', '+D.mod+' are moderate':''} and ${D.not} do not (${D.met?'meeting':'not meeting'} the selected minimum of ${D.need}). Rajju ${D.rajju==='agree'?'agrees':'shows a dosha'} and Vedha ${D.vedha==='agree'?'agrees':'shows a dosha'}, the two poruthams the tradition treats as critical. `
+   +(canc.length?'Recognised exception rules were found ('+canc.length+') and modify the interpretation without changing any porutham result. ':'No applicable exception rule was found. ')+((M.mg.B.any||M.mg.G.any)?'Mangal Dosha is present in '+(M.mg.B.any&&M.mg.G.any?'both charts':'one chart')+'. ':'No Mangal Dosha is present. ')
+   +'The D1, Moon and D9 comparisons, the afflictions found and the running periods should be read together with this result. The porutham count alone does not recommend or reject a match; the final judgement rests with the practitioner and the couple.';
+  return `<div class="card"><h3 style="margin-top:0">Final matching summary</h3><div style="overflow-x:auto"><table>
+   ${sec(1,'Dashakoot result',`${D.agree} of ${10-D.pend} agree · ${D.mod} moderate · ${D.not} do not agree${D.pend?' · '+D.pend+' '+DK_PEND:''}`)}
+   ${sec(2,'Varnadi Panchaka result',dks().vp==='prov'?'PROVISIONAL profile only – see the Varnadi Panchaka tab':DK_PEND)}
+   ${sec(3,'Strongest compatibility factors',esc(okR.join(', ')||'–'))}${sec(4,'Weakest compatibility factors',esc(badR.concat(mdR.map(x=>x+' (moderate)')).join(', ')||'none'))}
+   ${sec(5,'Rajju Dosha status',esc(S1.rows.find(r=>r.label==='Rajju').orig+' – '+S1.rows.find(r=>r.label==='Rajju').final))}${sec(6,'Vedha status',esc(S1.rows.find(r=>r.label==='Vedha').orig+' – '+S1.rows.find(r=>r.label==='Vedha').final))}
+   ${sec(7,'Mangal Dosha',esc(S1.rows.find(r=>r.label==='Mangal').orig+' – '+S1.rows.find(r=>r.label==='Mangal').final))}
+   ${sec(8,'D1 compatibility',esc('7th lords: '+D1[2][3].replace('Relation of the two 7th lords: ','')+'. Venus lords: '+D1[3][3].replace('Venus lords: ','')+'.'))}
+   ${sec(9,'Moon chart compatibility',esc('Moon-sign lords '+(M.same?'are the same planet':M.k.GRAHA.r1+' / '+M.k.GRAHA.r2)+'; Moon dignities '+M.XB.dig('Moon')+' (boy), '+M.XG.dig('Moon')+' (girl).'))}
+   ${sec(10,'D9 compatibility',esc('Boy: '+D9[7][1]+'. Girl: '+D9[7][2]+'.'))}
+   ${sec(11,'Dasha compatibility',esc((dB&&dG&&dB.r.pd&&dG.r.pd)?'Today the boy runs '+dB.md+'/'+dB.ad+'/'+dB.pd+' and the girl '+dG.md+'/'+dG.ad+'/'+dG.pd+'. See the Dasha comparison tab for any other date.':'Dasha not available for today.'))}
+   ${sec(12,'Exception and cancellation analysis',canc.length?li(canc):'No applicable exception rule found')}
+   ${sec(13,'Integrated conclusion',esc(conc))}${VD?sec(14,'Verdict by the author\'s decision rule',esc(VD.verdict+' – gatekeepers: '+VD.gate.map(x=>x.id+' '+x.res).join(', ')+'; core pillars agreeing '+VD.coreN+' of '+VD.core.length+' (need '+VD.d.coreMin+'); '+VD.n+' poruthams pass ('+VD.level+'). Gatekeeper decision (Rajju → Vedha → threshold '+VD.thr+'): '+VD.final+'.')):''}</table></div>
+   <div class="row" style="margin-top:8px"><b>Positive indicators</b></div>${li(pos)}<div class="row" style="margin-top:6px"><b>Challenging indicators</b></div>${li(neg)}
+   <p class="mute" style="margin-bottom:0">The traditional Dashakoot result, the exception-adjusted interpretation, and the supplementary horoscope compatibility (D1, Moon, D9, Dasha) are kept as three separate outputs.</p></div>`;
+}
+function dkRe(M){
+  const x=V.mlx;V.mlx=true;const pl=mlPl(M);V.mlx=x;
+  const S1=dkSummary(M),sumRows=S1.rows.map(r=>`<tr><td><b>${r.label}</b></td><td>${esc(r.orig)}</td><td>${esc(r.ids)}</td><td>${r.eff}</td><td>${esc(r.final)}</td></tr>`).join('');
+  const dr=(a,b)=>`<div class="card"><b>${a}</b> <span translate="no">${esc(b.name)}</span> – ${esc(b.date)} ${esc(b.time)}, <span translate="no">${esc(b.place)}</span> (${b.lat}, ${b.lon}), UTC${b.tz>=0?'+':''}${b.tz}${b.dst?', DST −'+b.dst+' h':''} · ${esc(mlProfile(b))}</div>`;
+  const keep=V.mc,ch=['d1','moon','d9'].map(t=>{V.mc=t;return mlCh(M)}).join('');V.mc=keep;
+  return `<div class="card noprint"><div class="row"><h3 style="margin:0">Final report</h3><button class="pri" style="margin-left:auto" onclick="window.print()">Print / Save as PDF</button></div></div>
+   <div class="card rhead" translate="no" style="text-align:center"><div style="font-size:26px;font-weight:700;color:#a8841a">AppstroSutras – Dashakoot Milan</div><div class="mute">AppstroSutras by Anoopam Shukla · Report date ${todayISO()}</div></div>
+   ${dr('Boy / Groom:',M.cB)}${dr('Girl / Bride:',M.cG)}
+   <div class="card"><h3>Dashakoot (original traditional result)</h3>${dkTable(M)}</div>
+   <div class="card"><h3>Exception summary</h3><div style="overflow-x:auto"><table><tr><th>Koota / Dosha</th><th>Original status</th><th>Exception found</th><th>Effect</th><th>Final status</th></tr>${sumRows}</table></div><p class="mute" style="margin-bottom:0">Original results are unchanged by exceptions.</p></div>
+   ${dkVp(M)}${dkSu(M)}${dkDo(M)}${ch}${pl}${mlDa(M)}`;
 }
 
 /* ============ KP – KRISHNAMURTI PADDHATI ============ */
@@ -3824,9 +4422,9 @@ function vSens(){
   <div class="card"><div style="overflow-x:auto"><table><tr><th>Shift</th><th>Time</th><th>Lagna</th><th>D9 Lagna</th><th>D10 Lagna</th><th>Moon</th><th>Dasha at birth</th></tr>${rows.join('')}</table></div></div>`;
 }
 function vLab(){
-  const sub=V.lb||'work',subs=[['work','Workspace'],['panch','Panchanga'],['sens','Birth-time Sensitivity'],['milan','Ashtakoot Milan'],['sbc','Sarvatobhadra Chakra']];
+  const sub=V.lb||'work',subs=[['work','Workspace'],['panch','Panchanga'],['sens','Birth-time Sensitivity'],['milan','Ashtakoot Milan'],['sbc','Sarvatobhadra Chakra'],['dkoot','Dashakoot']];
   const bar=`<div class="card" style="padding:8px 14px"><div class="row"><b style="color:var(--acc)">Astro Lab</b><span class="mute">›</span>${subs.map(([k,l])=>`<button class="${sub===k?'on':''}" onclick="V.lb='${k}';render()">${l}</button>`).join('')}</div></div>`;
-  return bar+(sub==='work'?vWork():sub==='panch'?vPanch():sub==='milan'?vMilan():sub==='sbc'?vSBC():vSens());
+  return bar+(sub==='work'?vWork():sub==='panch'?vPanch():sub==='milan'?vMilan():sub==='sbc'?vSBC():sub==='dkoot'?vDash():vSens());
 }
 /* ============ RESEARCH menu ============ */
 function vEvents(){
