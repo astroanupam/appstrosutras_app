@@ -3937,6 +3937,581 @@ function dkRe(M){
    ${dkVp(M)}${dkSu(M)}${dkDo(M)}${ch}${pl}${mlDa(M)}`;
 }
 
+/* ============ NUMEROLOGY MULTI-STREAM ENGINE (Astro Lab › Numerology) ============
+   Five independent streams: Pythagorean, Chaldean, Vedic (Anka Jyotish), Lo Shu grid, Kabbalah/Hebrew gematria.
+   Each stream has its own alphabet, reduction rule and trail. Streams are never merged into one formula; the synthesis only
+   READS the results. Rules are standard published conventions (secondary sources); primary-source verification is pending. */
+addTr([['Numerology','अंक ज्योतिष','અંકશાસ્ત્ર'],['Mulank','मूलांक','મૂળાંક'],['Bhagyank','भाग्यांक','ભાગ્યાંક'],['Namank','नामांक','નામાંક']]);
+const NUM_LET='ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+const NUM_PY=Object.fromEntries([...NUM_LET].map((c,i)=>[c,(i%9)+1]));
+const NUM_CH={A:1,B:2,C:3,D:4,E:5,F:8,G:3,H:5,I:1,J:1,K:2,L:3,M:4,N:5,O:7,P:8,Q:1,R:2,S:3,T:4,U:6,V:6,W:6,X:5,Y:1,Z:7};
+const NUM_HE={'א':['Aleph',1],'ב':['Bet',2],'ג':['Gimel',3],'ד':['Dalet',4],'ה':['He',5],'ו':['Vav',6],'ז':['Zayin',7],'ח':['Het',8],'ט':['Tet',9],'י':['Yod',10],'כ':['Kaf',20],'ל':['Lamed',30],'מ':['Mem',40],'נ':['Nun',50],'ס':['Samekh',60],'ע':['Ayin',70],'פ':['Pe',80],'צ':['Tsade',90],'ק':['Qof',100],'ר':['Resh',200],'ש':['Shin',300],'ת':['Tav',400],'ך':['Kaf (final)',20,500],'ם':['Mem (final)',40,600],'ן':['Nun (final)',50,700],'ף':['Pe (final)',80,800],'ץ':['Tsade (final)',90,900]};
+const NUM_PLANET={1:'Sun',2:'Moon',3:'Jupiter',4:'Rahu',5:'Mercury',6:'Venus',7:'Ketu',8:'Saturn',9:'Mars'};
+const NUM_PLANET_SIG={Sun:'authority, vitality, self-expression',Moon:'mind, emotions, nurturing',Jupiter:'wisdom, growth, guidance',Rahu:'ambition, unconventional paths, illusion',Mercury:'intellect, speech, trade',Venus:'relationships, comfort, arts',Ketu:'detachment, introspection, spiritual search',Saturn:'discipline, duty, delay and endurance',Mars:'energy, courage, drive'};
+const NUM_PY_KEY={1:'independence, initiative, leadership',2:'cooperation, sensitivity, partnership',3:'expression, creativity, communication',4:'order, discipline, foundations',5:'change, freedom, versatility',6:'responsibility, care, harmony',7:'analysis, introspection, inner search',8:'achievement, authority, material focus',9:'completion, compassion, wider perspective'};
+const NUM_LOSHU=[[4,9,2],[3,5,7],[8,1,6]];
+function nms(){if(!V.nm)V.nm=Object.assign({},NUM_DEF,JSON.parse(JSON.stringify((S.ui&&S.ui.num)||{})));return V.nm}
+function numReset(){V.nm=Object.assign({},NUM_DEF);S.ui=S.ui||{};delete S.ui.num;save();render()}
+function numUseChart(id,who){const c=S.charts.find(x=>x.id===id);if(!c)return;const nm=String(c.name||'').replace(/\s*\([^)]*\)\s*/g,' ').trim(),s=nms(),p=nm.split(/\s+/);
+  if(who==='A'){s.fn=p[0]||'';s.ln=p.length>1?p[p.length-1]:'';s.mn=p.length>2?p.slice(1,-1).join(' '):'';s.full=nm;s.dob=c.date;s.chartA=id}else{s.pb=id}
+  S.ui=S.ui||{};S.ui.num=Object.assign({},s);save();render()}
+/* ---- engines ---- */
+function numNorm(str){
+  const orig=String(str||''),fold=orig.normalize('NFD').replace(/[̀-ͯ]/g,'').toUpperCase(),scripts=[];
+  if(/[ऀ-ॿ]/.test(orig))scripts.push('Devanagari');if(/[઀-૿]/.test(orig))scripts.push('Gujarati');
+  const norm=fold.replace(/[^A-Z]/g,''),dropped=[...fold].filter(c=>!/[A-Z\s]/.test(c)&&!/[ऀ-ॿ઀-૿]/.test(c));
+  return {orig,norm,letters:[...norm],scripts,dropped};
+}
+function numRed(n,keep){const chain=[n];n=+n;while(n>9&&!(keep&&keep.includes(n))){n=String(n).split('').reduce((a,d)=>a+ +d,0);chain.push(n)}return {n,chain,text:chain.join(' → ')+(keep&&keep.includes(n)&&chain.length>0&&n>9?' (master)':'')}}
+const NUM_KARMIC={13:4,14:5,16:7,19:1};
+function numKarmic(chain){return chain.filter(x=>NUM_KARMIC[x]).map(x=>x+'/'+NUM_KARMIC[x])}
+function numDate(d){const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(d||'');if(!m)return null;const y=+m[1],mo=+m[2],dd=+m[3],t=new Date(Date.UTC(y,mo-1,dd));if(t.getUTCFullYear()!==y||t.getUTCMonth()!==mo-1||t.getUTCDate()!==dd)return null;return {y,mo,d:dd,str:d}}
+const numSum=a=>a.reduce((x,y)=>x+y,0),numDigits=n=>String(n).split('').map(Number);
+function numWord(letters,map){const v=letters.map(l=>map[l]);return {letters,vals:v,total:numSum(v)}}
+/* Pythagorean */
+/* Chaldean */
+function numChal(P,o){
+  const full=numNorm(P.full),parts=[P.fn,P.mn,P.ln].map(numNorm),out={};
+  const w=numWord(full.letters,NUM_CH);out.name={total:w.total,red:numRed(w.total,[]),vals:w.vals};
+  out.parts=parts.map(p=>{const q=numWord(p.letters,NUM_CH);return {name:p.norm,total:q.total,red:numRed(q.total,[])}});
+  const vow='AEIOU',v1=numWord(full.letters.filter(l=>vow.includes(l)),NUM_CH),c1=numWord(full.letters.filter(l=>!vow.includes(l)),NUM_CH);out.vow={total:v1.total,red:numRed(v1.total,[])};out.con={total:c1.total,red:numRed(c1.total,[])};
+  const D=numDate(P.dob);if(D){out.birth={raw:D.d,red:numRed(D.d,[])};const t=numSum(numDigits(D.d).concat(numDigits(D.mo),numDigits(D.y)));out.dest={total:t,red:numRed(t,[])}}
+  return out;
+}
+/* Vedic */
+function numVedic(P,o){
+  const D=numDate(P.dob),out={},map=o.vs==='py'?NUM_PY:NUM_CH,full=numNorm(P.full),w=numWord(full.letters,map);
+  out.nam={total:w.total,red:numRed(w.total,[]),sys:o.vs==='py'?'Pythagorean':'Chaldean'};
+  if(D){out.mul=numRed(D.d,[]);const t=numSum(numDigits(D.d).concat(numDigits(D.mo),numDigits(D.y)));out.bha={total:t,red:numRed(t,[])}}
+  return out;
+}
+const numPl=n=>NUM_PLANET[n]||'';
+/* Lo Shu */
+/* Kabbalah */
+function numHeb(txt){
+  const clean=String(txt||'').replace(/[֑-ׇ]/g,''),items=[],bad=[];
+  for(const ch of clean){if(/\s/.test(ch))continue;const e=NUM_HE[ch];if(!e){bad.push(ch);continue}items.push({ch,name:e[0],reg:e[1],gad:e[2]||e[1],kat:(()=>{let v=e[1];while(v>=10&&v%10===0)v/=10;return v})()})}
+  const hech=numSum(items.map(i=>i.reg)),gad=numSum(items.map(i=>i.gad)),kat=numSum(items.map(i=>i.kat));
+  return {items,bad,hech,gad,kat,hechRed:numRed(hech,[]),gadRed:numRed(gad,[]),katRed:numRed(kat,[])};
+}
+/* Personal cycles (Pythagorean) */
+/* ---- rule register (sources are secondary; verification pending) ---- */
+const NUM_SRC='Standard published convention (secondary sources); primary source NOT verified';
+const NUM_RULES=[
+ ['NUM_PY_001','Pythagorean','Alphabet A–Z = 1–9 repeating (A=1 … I=9, J=1 … R=9, S=1 … Z=8)','Mapping',NUM_SRC,'Standard'],
+ ['NUM_PY_002','Pythagorean','Reduction by digital root, preserving master numbers 11, 22 and 33','Reduction',NUM_SRC,'Standard'],
+ ['NUM_PY_003','Pythagorean','Life Path – component-wise: reduce month, day and year separately (masters kept), add, reduce','Formula',NUM_SRC,'Variant A (default)'],
+ ['NUM_PY_004','Pythagorean','Life Path – all digits of DDMMYYYY added, then reduced','Formula',NUM_SRC,'Variant B (selectable)'],
+ ['NUM_PY_005','Pythagorean','Expression = full birth-name letters; Soul Urge = vowels; Personality = consonants','Formula',NUM_SRC,'Standard'],
+ ['NUM_PY_006','Pythagorean','Y as consonant (default) or as vowel','Variant',NUM_SRC+'; schools differ on Y','Disputed – both selectable'],
+ ['NUM_PY_007','Pythagorean','Karmic debt: 13/4, 14/5, 16/7, 19/1 when the compound appears before reduction','Formula',NUM_SRC,'Standard'],
+ ['NUM_PY_008','Pythagorean','Pinnacles: month+day, day+year, sum of the first two, month+year; Challenges: differences; first pinnacle ends at age 36 minus the single-digit Life Path','Formula',NUM_SRC+'; age rules and master handling vary','Disputed – default shown'],
+ ['NUM_PY_009','Pythagorean','Personal Year = month + day + year (calendar year or birthday-to-birthday); Personal Month and Day follow','Formula',NUM_SRC,'Both conventions selectable'],
+ ['NUM_CH_001','Chaldean','Alphabet 1–8 (A,I,J,Q,Y=1; B,K,R=2; C,G,L,S=3; D,M,T=4; E,H,N,X=5; U,V,W=6; O,Z=7; F,P=8); 9 is not assigned to any letter','Mapping',NUM_SRC,'Standard'],
+ ['NUM_CH_002','Chaldean','Compound number (sum) is kept together with its single-digit root; master numbers are not preserved','Reduction',NUM_SRC,'Standard'],
+ ['NUM_CH_003','Chaldean','Compound-number (10–52) interpretation database','Interpretation','Not available in the sources consulted','RESEARCH PENDING'],
+ ['NUM_VE_001','Vedic','Mulank = birth day reduced to one digit; Bhagyank = all digits of the date reduced to one digit; Namank = name number','Formula',NUM_SRC,'Standard'],
+ ['NUM_VE_002','Vedic','Number–planet mapping 1 Sun, 2 Moon, 3 Jupiter, 4 Rahu, 5 Mercury, 6 Venus, 7 Ketu, 8 Saturn, 9 Mars','Mapping','Supplied in the project specification; schools may differ','Selectable convention'],
+ ['NUM_VE_003','Vedic','Namank uses the Chaldean mapping (common Indian practice) or the Pythagorean mapping','Variant',NUM_SRC,'Both selectable'],
+ ['NUM_VE_004','Vedic','Friend / neutral / enemy numbers derived from the natural friendship of the mapped planets (Sun, Moon, Jupiter, Mercury, Venus, Saturn, Mars). Rahu and Ketu are not defined','Derived table','Derived from the natural planetary friendship used in this app; NOT a numerology-school table','Derived – RESEARCH PENDING for 4 and 7'],
+ ['NUM_VE_005','Vedic','Lucky, unfavourable, driver and conductor number tables of individual Indian schools','Interpretation','Schools differ; none reproduced','RESEARCH PENDING'],
+ ['NUM_LS_001','Lo Shu','Magic-square arrangement 4 9 2 / 3 5 7 / 8 1 6','Layout','Supplied as the baseline in the project specification','Standard baseline'],
+ ['NUM_LS_002','Lo Shu','Digits of the birth date placed in the grid; zero ignored by default; full year; derived numbers not added unless selected','Formula',NUM_SRC,'Configurable'],
+ ['NUM_LS_003','Lo Shu','A complete arrow = all three numbers of a row, column or diagonal present; an empty arrow = all three absent','Formula',NUM_SRC,'Standard'],
+ ['NUM_LS_004','Lo Shu','Plane labels (Mental, Emotional, Practical, Thought, Willpower, Action) for the rows and columns; labels of the two diagonals (Physical, Intuitive in the specification) not assigned','Labels','Names vary by author','Rows/columns: common labels; diagonals RESEARCH PENDING'],
+ ['NUM_KB_001','Kabbalah','Hebrew letter values 1–9, 10–90, 100–400; Mispar Hechrechi (standard) keeps final letters at their ordinary values','Mapping',NUM_SRC,'Standard'],
+ ['NUM_KB_002','Kabbalah','Mispar Gadol: final letters Kaf 500, Mem 600, Nun 700, Pe 800, Tsade 900','Mapping',NUM_SRC,'Standard'],
+ ['NUM_KB_003','Kabbalah','Mispar Katan: each letter value with its zeros dropped (10→1, 300→3), then added','Formula',NUM_SRC,'Standard'],
+ ['NUM_KB_004','Kabbalah','Transliteration of English names into Hebrew','Transliteration','Results depend on the scheme chosen; no scheme is adopted','RESEARCH PENDING – Hebrew letters must be entered'],
+ ['NUM_IN_001','Input','Hindi, Gujarati and other scripts: no letter-to-number mapping is applied until a documented transliteration scheme exists; enter the Roman spelling','Input','Policy of this engine','Enforced'],
+ ['NUM_CM_001','Compatibility','Qualitative comparison only (same numbers, derived planetary friendship, Lo Shu overlap); no numeric compatibility score','Policy','No documented scoring methodology available','Enforced']
+].map(r=>({id:r[0],stream:r[1],rule:r[2],kind:r[3],source:r[4],status:r[5],version:'1.0'}));
+/* ---- page helpers ---- */
+const numCard=(label,val,sub,steps)=>`<div class="card" style="margin:0;padding:10px 12px"><div class="mute" style="font-size:12px">${label}</div><div style="font-size:26px;font-weight:800;color:var(--acc)">${val}</div>${sub?`<div style="font-size:12px" class="mute">${sub}</div>`:''}${steps?`<details style="margin-top:4px"><summary style="font-size:12px">calculation</summary><div style="font-size:12px" class="mute">${steps}</div></details>`:''}</div>`;
+const numGrid=a=>`<div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px">${a.join('')}</div>`;
+const numRd=r=>r.n+(r.chain.length>1?'':'');
+function numPerson(){const s=nms(),P={fn:s.fn,mn:s.mn,ln:s.ln,full:s.full||[s.fn,s.mn,s.ln].filter(Boolean).join(' '),dob:s.dob};return P}
+function numAll(P,o){return {py:numPyth(P,o),ch:numChal(P,o),ve:numVedic(P,o),ls:numLoShu(P,o),kb:o.he?numHeb(o.he):null,D:numDate(P.dob)}}
+/* ---- tabs ---- */
+function numWarn(P){const f=numNorm(P.full),w=[];if(f.scripts.length)w.push('The name contains '+f.scripts.join(' / ')+' script. No letter-to-number mapping is applied to it (NUM_IN_001): enter the Roman spelling used by the person.');if(f.dropped.length)w.push('Ignored characters: '+f.dropped.join(' ')+' (spaces, hyphens, apostrophes and digits are not letters).');if(!f.letters.length)w.push('Enter a name to calculate name numbers.');if(P.dob&&!numDate(P.dob))w.push('The date of birth is not a valid calendar date.');if(!P.dob)w.push('Enter a date of birth for date-based numbers.');return w}
+function numTabKb(P,o,A){
+  const he=A.kb;
+  const keys=Object.keys(NUM_HE).map(ch=>`<button class="sm" style="font-size:18px;min-width:34px" onclick="numSet('he',(nms().he||'')+'${ch}')" title="${NUM_HE[ch][0]}">${ch}</button>`).join('');
+  const head=`<div class="card"><b>Hebrew letters</b><div class="row" style="margin-top:6px"><input value="${esc(nms().he||'')}" dir="rtl" style="width:260px;font-size:20px" placeholder="שלום" onchange="numSet('he',this.value)"><button class="sm" onclick="numSet('he','')">Clear</button></div><div class="row" style="margin-top:6px;gap:4px">${keys}</div>
+   <p class="mute" style="margin:6px 0 0">Hebrew letters must be entered. English names need an explicit transliteration scheme and results depend on it, so none is applied (NUM_KB_004: RESEARCH PENDING). Pythagorean and Chaldean mappings are never used for Hebrew.</p></div>`;
+  if(!he||!he.items.length)return head+'<div class="card mute">Enter a Hebrew word or name to calculate Mispar Hechrechi, Mispar Gadol and Mispar Katan.</div>';
+  const rows=he.items.map(i=>`<tr><td style="font-size:20px">${i.ch}</td><td>${i.name}</td><td>${i.reg}</td><td>${i.gad}</td><td>${i.kat}</td></tr>`).join('');
+  return head+`<div class="card">${numGrid([numCard('Mispar Hechrechi (standard)',he.hech,'reduced: '+he.hechRed.text,''),numCard('Mispar Gadol (finals 500–900)',he.gad,'reduced: '+he.gadRed.text,''),numCard('Mispar Katan',he.kat,'reduced: '+he.katRed.text,'')])}
+   ${he.bad.length?`<p class="bad" style="margin:6px 0 0">Not Hebrew letters (ignored): ${esc(he.bad.join(' '))}</p>`:''}<details style="margin-top:8px" open><summary>Letter by letter</summary><table style="font-size:13px"><tr><th>Letter</th><th>Name</th><th>Hechrechi</th><th>Gadol</th><th>Katan</th></tr>${rows}</table></details></div>`;
+}
+function numTabBiz(P,o,A){
+  const s=nms(),bn=s.biz||'';
+  const head=`<div class="card"><b>Business and brand name</b><div class="row" style="margin-top:6px"><input value="${esc(bn)}" style="width:300px" placeholder="Business / brand / domain name" onchange="numSet('biz',this.value)"><label style="display:inline;margin:0">Launch date <input type="date" value="${s.launch||''}" onchange="numSet('launch',this.value)"></label></div><p class="mute" style="margin:6px 0 0">Founder = the person in the inputs. No number is claimed to guarantee business success.</p></div>`;
+  if(!numNorm(bn).letters.length)return head+'<div class="card mute">Enter a business name in Roman letters.</div>';
+  const Q=Object.assign({},P,{full:bn,fn:'',mn:'',ln:''}),py=numPyth(Q,o),ch=numChal(Q,o),ve=numVedic(Q,o),L=numDate(s.launch);
+  const fnums=A.ve.mul?[A.ve.mul.n,A.ve.bha.red.n]:[];
+  const rels=fnums.map((n,i)=>(i?'Bhagyank ':'Mulank ')+n+' ↔ brand '+ve.nam.red.n+': '+numRel(n,ve.nam.red.n).k).join(' · ');
+  let launch='';if(L){const t=numSum(numDigits(L.d).concat(numDigits(L.mo),numDigits(L.y))),r=numRed(t,[]);launch=`<tr><td class="mute">Launch date</td><td>day root ${numRed(L.d,[]).n} · date total ${t} → ${r.n} (${numPl(r.n)}); relation to founder Mulank: ${fnums.length?numRel(fnums[0],r.n).k:'–'}</td></tr>`}
+  return head+`<div class="card">${numGrid([numCard('Chaldean (compound / root)',ch.name.total+' / '+ch.name.red.n,'',''),numCard('Pythagorean',py.exp.total+' → '+py.exp.red.n,'',''),numCard('Vedic Namank',ve.nam.red.n,numPl(ve.nam.red.n),'')])}
+   <table style="font-size:13px;margin-top:8px"><tr><td class="mute" style="width:200px">Founder compatibility</td><td>${rels||'Enter the founder\'s date of birth'} <span class="mute">(derived friendship)</span></td></tr>${launch}</table>
+   <p class="mute" style="margin:6px 0 0">Alternative spellings of the business name can be compared in the Names tab by listing them there. Name correction suggestions are not generated.</p></div>`;
+}
+function numTabDash(P,o,A){
+  const on=nms().on,R=[],add=(stream,label,val)=>{if(val!==undefined&&val!==null&&val!=='')R.push({stream,label,val})};
+  const py=A.py,ch=A.ch,ve=A.ve;
+  const cyc=numCycle(P,o,nms().cdate||new Date().toISOString().slice(0,10));
+  const cell=(k,v)=>on[k]?(v===undefined||v===null||v===''?'<span class="mute">N/A</span>':v):'<span class="mute">off</span>';
+  const rows=[
+   ['Life / birth number',cell('py',py.lp?py.lp.red.n+' (Life Path)':null),cell('ch',ch.birth?ch.birth.red.n+' (Birth) · '+ch.dest.red.n+' (Destiny)':null),cell('ve',ve.mul?ve.mul.n+' (Mulank) · '+ve.bha.red.n+' (Bhagyank)':null),cell('ls',A.ls?'digits '+A.ls.used.join(''):null),cell('kb',null)],
+   ['Name number',cell('py',numNorm(P.full).letters.length?py.exp.red.n+' (Expression)':null),cell('ch',numNorm(P.full).letters.length?ch.name.red.n:null),cell('ve',numNorm(P.full).letters.length?ve.nam.red.n+' (Namank)':null),cell('ls',null),cell('kb',A.kb&&A.kb.items.length?A.kb.hech+' → '+A.kb.hechRed.n+' (Hechrechi)':null)],
+   ['Soul / inner number',cell('py',numNorm(P.full).letters.length?py.soul.red.n+' (Soul Urge)':null),cell('ch',null),cell('ve',ve.mul?ve.mul.n+' (Psychic = Mulank)':null),cell('ls',null),cell('kb',null)],
+   ['Personality',cell('py',numNorm(P.full).letters.length?py.pers.red.n:null),cell('ch',null),cell('ve',null),cell('ls',null),cell('kb',null)],
+   ['Compound number',cell('py',numNorm(P.full).letters.length?py.exp.total:null),cell('ch',numNorm(P.full).letters.length?ch.name.total:null),cell('ve',numNorm(P.full).letters.length?ve.nam.total:null),cell('ls',null),cell('kb',A.kb&&A.kb.items.length?A.kb.hech:null)],
+   ['Personal cycle',cell('py',cyc?cyc.py.n+' (Personal Year)':null),cell('ch',null),cell('ve',cyc?cyc.py.n+' (Varshank)':null),cell('ls',null),cell('kb',null)]];
+  // synthesis (reads only)
+  const found=[];if(on.py){if(py.lp)found.push(['Pythagorean Life Path',py.lp.red.n]);if(numNorm(P.full).letters.length)found.push(['Pythagorean Expression',py.exp.red.n])}
+  if(on.ch){if(numNorm(P.full).letters.length)found.push(['Chaldean name root',ch.name.red.n]);if(ch.birth)found.push(['Chaldean birth number',ch.birth.red.n]);if(ch.dest)found.push(['Chaldean destiny',ch.dest.red.n])}
+  if(on.ve){if(ve.mul){found.push(['Mulank',ve.mul.n]);found.push(['Bhagyank',ve.bha.red.n])}if(numNorm(P.full).letters.length)found.push(['Namank',ve.nam.red.n])}
+  if(on.kb&&A.kb&&A.kb.items.length)found.push(['Hechrechi (reduced)',A.kb.hechRed.n]);
+  const by={};found.forEach(([l,n])=>{(by[n]=by[n]||[]).push(l)});
+  const rep=Object.keys(by).filter(n=>by[n].length>=2).map(n=>n+' – '+by[n].join(', '));
+  const warn=numWarn(P);
+  return `${warn.length?`<div class="card" style="border-left:4px solid var(--warn)"><ul style="margin:0 0 0 18px">${warn.map(w=>`<li>${esc(w)}</li>`).join('')}</ul></div>`:''}
+   <div class="card"><h3 style="margin-top:0">Multi-stream comparison</h3><div style="overflow-x:auto"><table style="font-size:13px"><tr><th>Calculation</th><th>Pythagorean</th><th>Chaldean</th><th>Vedic</th><th>Lo Shu</th><th>Kabbalah</th></tr>${rows.map(r=>`<tr><td><b>${r[0]}</b></td>${r.slice(1).map(x=>`<td>${x}</td>`).join('')}</tr>`).join('')}</table></div>
+   <p class="mute" style="margin:6px 0 0">N/A = the stream has no equivalent concept; nothing is forced into equivalence. Similar names across streams are not mathematically equivalent.</p></div>
+   <div class="card"><h3 style="margin-top:0">Synthesis (reads the results; changes nothing)</h3><table style="font-size:13px">
+   <tr><td class="mute" style="width:200px">Repeated numbers across calculations</td><td>${rep.join(' · ')||'none'}</td></tr>
+   <tr><td class="mute">Different numbers</td><td>${Object.keys(by).length>1?Object.keys(by).map(n=>n+' ('+by[n].length+')').join(', ')+' – the streams use different rules, so differences are expected':'–'}</td></tr>
+   <tr><td class="mute">Source quality</td><td>Standard published conventions from secondary sources; primary sources not verified. Interpretation databases are mostly RESEARCH PENDING.</td></tr>
+   <tr><td class="mute">Needs practitioner judgement</td><td>Choice of Life Path variant, Y as vowel, Indian school tables, Lo Shu labels, Hebrew transliteration, and any predictive reading.</td></tr></table>
+   <p class="mute" style="margin:6px 0 0">Numerology is a traditional/belief-based framework, not a scientifically established method. Nothing here predicts outcomes.</p></div>
+   <div class="row noprint"><button class="pri" onclick="window.print()">Print / Save report (PDF)</button></div>`;
+}
+const NUM_GOLD=[
+ ['Pythagorean HELLO','HELLO',()=>{const w=numWord([...'HELLO'],NUM_PY);return {steps:'HELLO → 8+5+3+3+6 = '+w.total+' → '+numRed(w.total,[11,22,33]).text,ok:w.total===25&&numRed(w.total,[11,22,33]).n===7,val:'25 → 7'}}],
+ ['Chaldean HELLO','HELLO',()=>{const w=numWord([...'HELLO'],NUM_CH);return {steps:'HELLO → 5+5+3+3+7 = '+w.total+' → '+numRed(w.total,[]).text,ok:w.total===23&&numRed(w.total,[]).n===5,val:'23 / 5'}}],
+ ['Master number kept (Pythagorean)','38',()=>{const r=numRed(38,[11,22,33]);return {steps:'38 → 3+8 = 11 (master, stop)',ok:r.n===11,val:'11'}}],
+ ['Not a master (44)','44',()=>{const r=numRed(44,[11,22,33]);return {steps:'44 → 8',ok:r.n===8,val:'8'}}],
+ ['Life Path 1990-12-25 (component-wise)','1990-12-25',()=>{const p=numPyth({full:'',dob:'1990-12-25'},{lp:'comp'});return {steps:'month 12→3, day 25→7, year 1990→19→10→1; 3+7+1 = 11 (master)',ok:p.lp.red.n===11,val:'11'}}],
+ ['Life Path 1990-12-25 (all digits)','1990-12-25',()=>{const p=numPyth({full:'',dob:'1990-12-25'},{lp:'all'});return {steps:'1+2+2+5+1+9+9+0 = 29 → 11 (master)',ok:p.lp.red.n===11,val:'11'}}],
+ ['Life Path 1985-07-15','1985-07-15',()=>{const p=numPyth({full:'',dob:'1985-07-15'},{lp:'comp'});return {steps:'month 7, day 15→6, year 1985→23→5; 7+6+5 = 18 → 9',ok:p.lp.red.n===9,val:'9'}}],
+ ['Mulank / Bhagyank for the leap-year date 2000-02-29','2000-02-29',()=>{const v=numVedic({full:'',dob:'2000-02-29'},{vs:'ch'});return {steps:'day 29 → 2; digits 2+9+0+2+2+0+0+0 = 15 → 6',ok:v.mul.n===2&&v.bha.red.n===6,val:'Mulank 2, Bhagyank 6'}}],
+ ['Invalid date 2023-02-29','2023-02-29',()=>({steps:'validated against the calendar → rejected',ok:numDate('2023-02-29')===null,val:'invalid'})],
+ ['Karmic debt','19',()=>{const k=numKarmic([19,10,1]);return {steps:'19 → 10 → 1; compound 19 seen before reduction',ok:k[0]==='19/1',val:'19/1'}}],
+ ['Lo Shu 1990-12-25','1990-12-25',()=>{const g=numLoShu({dob:'1990-12-25'},{lz:'n',ly:'full',ld:'n'});return {steps:'digits 2 5 1 2 1 9 9 (0 ignored) → 1×2, 2×2, 5×1, 9×2; complete arrow 9-5-1',ok:g.cnt[1]===2&&g.cnt[9]===2&&g.cnt[5]===1&&g.missing.join()==='3,4,6,7,8'&&g.lines.filter(l=>l.full).map(l=>l.name).join()==='Column 9-5-1',val:'missing 3,4,6,7,8'}}],
+ ['Pinnacles / challenges 1990-12-25','1990-12-25',()=>{const p=numPyth({full:'',dob:'1990-12-25'},{lp:'comp'});return {steps:'month 3, day 7, year 1; P1 10→1, P2 8, P3 9, P4 4; C1 4, C2 6, C3 2, C4 2; first pinnacle to age 36−2 = 34',ok:p.pin.map(x=>x.n.n).join()==='1,8,9,4'&&p.chal.join()==='4,6,2,2'&&p.pin[0].to===34,val:'1,8,9,4 / 4,6,2,2'}}],
+ ['Personal Year 1990-12-25 in 2026','1990-12-25',()=>{const c=numCycle({dob:'1990-12-25'},{py:'cal'},'2026-11-14');return {steps:'3 + 7 + (2+0+2+6=10→1) = 11 → 2',ok:c.py.n===2,val:'2'}}],
+ ['Hebrew שלום (shalom)','שלום',()=>{const h=numHeb('שלום');return {steps:'ש300 + ל30 + ו6 + ם40 = 376; Gadol (final mem 600) = 936; Katan 3+3+6+4 = 16',ok:h.hech===376&&h.gad===936&&h.kat===16,val:'376 / 936 / 16'}}],
+ ['Hyphen and apostrophe ignored',"O'BRIEN-SMITH",()=>{const n=numNorm("O'Brien-Smith");return {steps:"normalised to "+n.norm,ok:n.norm==='OBRIENSMITH',val:n.norm}}],
+ ['Accented name folded','José',()=>{const n=numNorm('José');return {steps:'É → E → '+n.norm,ok:n.norm==='JOSE',val:n.norm}}],
+ ['Devanagari input refused','राम',()=>{const n=numNorm('राम');return {steps:'script detected: '+n.scripts.join(),ok:n.scripts.includes('Devanagari')&&n.letters.length===0,val:'not mapped'}}],
+ ['Missing name','',()=>{const n=numNorm('');return {steps:'no letters',ok:n.letters.length===0,val:'–'}}]
+];
+function numTabAudit(){
+  const rows=NUM_GOLD.map(([t,inp,fn])=>{let r;try{r=fn()}catch(e){r={steps:'error '+e.message,ok:false,val:''}}return `<tr><td>${t}</td><td translate="no">${esc(inp)}</td><td style="font-size:12px">${esc(r.steps)}</td><td>${esc(r.val)}</td><td>${r.ok?'<span class="ok">✓</span>':'<span class="bad">✗</span>'}</td></tr>`}).join('');
+  const lt=Object.keys(NUM_CH).filter(k=>NUM_CH[k]===9).length===0&&Object.values(NUM_PY).every(v=>v>=1&&v<=9);
+  return `<div class="card"><h3 style="margin-top:0">Calculation audit</h3><p class="mute" style="margin-top:0">Each case shows input → normalisation → mapping → summation → reduction → result, checked against values worked out by hand. Agreement with this engine's own conventions is not independent validation against published references.</p>
+   <div style="overflow-x:auto"><table style="font-size:13px"><tr><th>Case</th><th>Input</th><th>Trail</th><th>Result</th><th>Check</th></tr>${rows}</table></div><p class="mute" style="margin-bottom:0">Alphabet checks: Pythagorean values all 1–9 and Chaldean has no 9 – ${lt?'<span class="ok">✓</span>':'<span class="bad">✗</span>'}.</p></div>`;
+}
+/* ============ NUMEROLOGY PART 2 – method profiles, supplied tables, interpretation layer, query, summary ============
+   Functions/consts declared here REPLACE same-named ones from part 1 (the assembler drops the older chunk). */
+const NUM_MK=['yv','lp','vs','py','lz','ly','ld','kua','ftab','cmpm'];
+const NUM_DEF={fn:'',mn:'',ln:'',full:'',alts:'',biz:'',dob:'',cdate:'',he:'',pb:'',g:'m',yv:'n',lp:'comp',py:'cal',vs:'ch',lz:'n',ly:'full',ld:'n',kua:'n',ll:'common',ftab:'der',cmpm:'qual',int:'y',mth:'custom',ref:'all',qry:'lp',on:{py:1,ch:1,ve:1,ls:1,kb:1},rel:'marriage',ox:'',osys:'chaldean',ot:'',otc:''};
+const NUM_PRESETS={
+ western:{label:'Western standard (Pythagorean)',d:'Y is a consonant · Life Path component-wise · Namank with the Pythagorean letters · Lo Shu from the birth date only · derived friendship · qualitative compatibility.',set:{yv:'n',lp:'comp',vs:'py',py:'cal',lz:'n',ly:'full',ld:'n',kua:'n',ftab:'der',cmpm:'qual'}},
+ indian:{label:'Indian practice (typical)',d:'Chaldean letters for Namank · Life Path component-wise · Lo Shu with Mulank and Bhagyank injected (Vedic rule) · derived friendship · qualitative compatibility. A typical combination, not the rulebook of one named school.',set:{yv:'n',lp:'comp',vs:'ch',py:'cal',lz:'n',ly:'full',ld:'vedic',kua:'n',ftab:'der',cmpm:'qual'}},
+ supplied:{label:'Supplied specification (pasted engine)',d:'Reproduces the pasted Python/FastAPI specification: Y consonant · component-wise Life Path · Chaldean Namank · Lo Shu with Vedic injection and Kua · supplied friendship table · supplied weighted compatibility. Tables and weights are unverified.',set:{yv:'n',lp:'comp',vs:'ch',py:'cal',lz:'n',ly:'full',ld:'vedic',kua:'y',ftab:'sup',cmpm:'sup'}},
+ digits:{label:'All-digits Life Path',d:'Same as Western standard but the Life Path adds every digit of the date once instead of reducing month, day and year separately.',set:{yv:'n',lp:'all',vs:'py',py:'cal',lz:'n',ly:'full',ld:'n',kua:'n',ftab:'der',cmpm:'qual'}}
+};
+function numSave(s){S.ui=S.ui||{};S.ui.num=Object.assign({},s);save();render()}
+function numSet(k,v){const s=nms();s[k]=v;if(NUM_MK.includes(k))s.mth='custom';numSave(s)}
+function numSetOn(k,v){const s=nms();s.on=Object.assign({},s.on);s.on[k]=v?1:0;numSave(s)}
+function numPreset(k){const s=nms();s.mth=k;if(NUM_PRESETS[k])Object.assign(s,NUM_PRESETS[k].set);numSave(s)}
+function numNav(k,v,tab){const s=nms();s[k]=v;V.nt=tab;numSave(s)}
+/* ---- supplied tables (secondary / unverified) ---- */
+const NUM_FR_SUP={1:[[1,2,3,9],[4,5,7],[6,8]],2:[[1,2,3,5],[4,6,7,8,9],[]],3:[[1,2,3,9],[4,7,8],[5,6]],4:[[5,6,7,8],[3],[1,2,9]],5:[[1,2,4,6],[3,7,8,9],[]],6:[[4,5,6,7,8],[3,9],[1,2]],7:[[4,5,6,8],[1,2,3],[9]],8:[[4,5,6,7],[3],[1,2,9]],9:[[1,2,3,9],[6,8],[4,5]]};
+const NUM_HARM={1:[[1,3,5,9],[2,6,7,8]],2:[[2,4,6,8],[1,3,7,9]],3:[[1,3,5,6,9],[2,7]],4:[[2,4,6,8],[7,9]],5:[[1,3,5,7,9],[6,8]],6:[[2,3,4,6,8,9],[1,5,7]],7:[[4,5,7],[1,2,3,6,8,9]],8:[[2,4,6,8],[1,5,7]],9:[[1,3,5,6,9],[2,4,7]]};
+const NUM_AUSP=[10,14,15,19,21,23,24,27,32,33,37,41,42,45,46,50,51,52];
+const NUM_INTNOTE='Interpretation text: modern / commercial wording supplied by the Product Owner (AI-generated draft). Not from a classical source and not verified.';
+const NUM_INT={
+ core:{1:['The Leader','Driven by autonomy, originality, and pioneering ambition.'],2:['The Diplomat','Excels in mediation, emotional intelligence, and cooperative balance.'],3:['The Communicator','Naturally gifted in storytelling, social magnetism, and artistic vision.'],4:['The Builder','Grounded in systems, hard work, and long-term material foundations.'],5:['The Catalyst','Thrives on versatility, exploration, and dynamic movement.'],6:['The Nurturer','Focused on family, community harmony, and protective stewardship.'],7:['The Seeker','Drawn to deep research, truth-seeking, and philosophical mastery.'],8:['The Executive','Oriented toward leadership, financial mastery, and institutional scale.'],9:['The Humanitarian','Driven by idealism, philanthropy, and broad-scale service.'],11:['The Intuitive Illuminator (Master Number)','Channels heightened intuition and visionary leadership (reduces to 2).'],22:['The Master Architect (Master Number)','Turns ambitious ideals into tangible, lasting global structures (reduces to 4).'],33:['The Master Teacher (Master Number)','Embodies selfless service and creative compassion (reduces to 6).']},
+ karmic:{13:'Focuses on overcoming shortcuts through disciplined, persistent effort.',14:'Calls for moderation, focus, and constructive use of personal freedom.',16:'Transforms ego attachment into deeper humility and authentic wisdom.',19:'Balances fierce self-reliance with openness to mutual support.'},
+ planes:{mental_plane:'Strong analytical memory, intellectual clarity, and conceptual agility.',emotional_plane:'High empathy, spiritual receptivity, and heart-led intuition.',practical_plane:'Grounded execution, logic, and attention to tangible detail.',thought_plane:'Strategic foresight, structured planning, and organizational skill.',willpower_plane:'High resilience, determination, and ability to overcome setbacks.',action_plane:'Rapid implementation, physical drive, and bias toward action.',golden_yog:'Rare diagonal alignment signifying strong material prosperity and success.',silver_yog:'Diagonal alignment indicating property stability, grounded wealth, and endurance.'},
+ transits:{1:'New beginnings, planting seeds, fresh initiatives, and bold independence.',2:'Patience, cooperation, relationship building, and behind-the-scenes gestation.',3:'Creative expansion, socializing, networking, and visible self-expression.',4:'Hard work, system building, financial discipline, and laying solid foundations.',5:'Pivot points, unexpected change, travel, freedom, and dynamic growth.',6:'Domestic focus, family responsibility, healing, and community commitments.',7:'Introspection, study, spiritual refinement, and strategic planning.',8:'Harvest time, career advancement, financial power, and executive execution.',9:'Completion, letting go, clearing clutter, and preparing for the next 9-year cycle.',11:'Heightened intuition, spiritual breakthroughs, and inspiring visibility.',22:'Master builder momentum; executing high-impact, long-term projects.'},
+ chal:{0:'The Challenge of Choice: All lessons are open; requires conscious self-direction rather than drifting.',1:'The Challenge of Independence: Overcoming self-doubt, passivity, or dominating ego to stand on your own.',2:'The Challenge of Sensitivity: Learning emotional boundaries without becoming overly dependent or hypersensitive.',3:'The Challenge of Expression: Overcoming scattered energy, self-criticism, or fear of speaking your truth.',4:'The Challenge of Discipline: Mastering consistency, patience, and organization instead of resisting structure.',5:'The Challenge of Focus: Channeling restlessness and impulse into constructive freedom and adaptability.',6:'The Challenge of Balance: Avoiding perfectionism, over-responsibility, or rescuing others at your own expense.',7:'The Challenge of Trust: Overcoming isolation, skepticism, or analytical paralysis through inner faith.',8:'The Challenge of Power: Balancing material ambition and authority with integrity and detachment.'},
+ comp:{10:'Wheel of Fortune: Rise and fall depending on willpower; leadership and honor.',14:'Movement & Communication: Media, public magnetism, and dynamic trade (requires stability).',15:'The Magician: Charisma, eloquence, artistic appeal, and financial magnetism.',19:'The Prince of Heaven: Success, esteem, happiness, and overcoming obstacles.',21:'The Crown of the Magi: Advancement, honors, elevation, and universal recognition.',23:'The Royal Star of the Lion: Protection, influence, assistance from superiors, and success.',24:'Love, Money & Creativity: Support from influential allies, harmony, and steady prosperity.',27:'The Sceptre: Authority, command, creative intellect, and productive leadership.',32:'Communication & Diplomacy: Mass appeal, travel, partnerships, and persuasive power.',33:'Fortunate Vibration: Harmony, public goodwill, and creative abundance.',37:'Royal Star of the Bull: Good friendships, partnerships, love, and favorable fortune.',41:'Strategic Attainment: Success through intellect, focus, and disciplined execution.',42:'Creative Harmony: Artistic success, material comfort, and cooperative alliances.',45:'Command & Synthesis: Overcoming early struggles to achieve decisive victory.',46:'The Crown of Prosperity: Abundance, leadership, and enduring creative success.',50:'Versatility & Reach: Broad influence, intellectual agility, and public visibility.',51:'The Warrior: Rapid advancement, bold leadership, and enterprise growth.',52:'Revolutionary Vision: Breakthrough innovation (best balanced with grounded execution).'},
+ tiers:{soulmate_harmonic:'Exceptional natural resonance across life direction, emotional values, and planetary temperament.',dynamic_growth:'Strong foundational alignment paired with stimulating differences that encourage mutual evolution.',karmic_catalyst:'High-intensity connection requiring conscious communication to bridge differing rhythms.',challenging_friction:'Distinct core operating styles; thrives best with clear boundaries and shared external goals.'},
+ themes:{1:'An independent, pioneering partnership built on mutual respect and shared ambition.',2:'A deeply empathetic, cooperative bond centered on emotional harmony and partnership.',3:'A joyful, expressive, and socially vibrant union fueled by creativity and humor.',4:'A grounded, loyal, and enduring alliance focused on building security and legacy.',5:'An adventurous, freedom-loving connection that thrives on travel, variety, and change.',6:'A nurturing, family-oriented, and protective partnership rooted in devotion.',7:'An intellectual, introspective, and spiritually aligned bond with deep trust.',8:'A high-achieving power couple focused on leadership, abundance, and material mastery.',9:'A compassionate, idealistic union dedicated to service, wisdom, and broad horizons.',11:'A spiritually electric connection marked by heightened intuition and shared inspiration.',22:'A master-builder partnership capable of manifesting major real-world ventures together.'}
+};
+const NUM_LINES=[['Row 4-9-2',[4,9,2],'Mental Plane','mental_plane','Intellectual capacity, memory, analytical thinking',''],['Row 3-5-7',[3,5,7],'Emotional Plane','emotional_plane','Intuition, heart-centred decisions, spirituality',''],['Row 8-1-6',[8,1,6],'Practical Plane','practical_plane','Grounded logic, material execution, detail-oriented',''],['Column 4-3-8',[4,3,8],'Thought Plane','thought_plane','Planning, visualisation, organisational ability',''],['Column 9-5-1',[9,5,1],'Willpower Plane','willpower_plane','Determination, resilience, persistence',''],['Column 2-7-6',[2,7,6],'Action Plane','action_plane','Execution speed, physical drive, turning ideas into reality',''],['Diagonal 4-5-6',[4,5,6],'Golden Yog (Raj Yog 1)','golden_yog','Material prosperity, success, abundance','Arrow of Confusion'],['Diagonal 2-5-8',[2,5,8],'Silver Yog (Raj Yog 2)','silver_yog','Property, real estate, stability, steady wealth','Arrow of Frustration']];
+const numArch=n=>{const c=NUM_INT.core[n];return c?c[0]+' – '+c[1]:'no wording recorded for '+n+' (RESEARCH PENDING)'};
+/* ---- engines (replacements / additions) ---- */
+function numVC(full,yv){const words=String(full||'').split(/[\s\-]+/).map(w=>numNorm(w).letters).filter(a=>a.length),v=[],c=[];
+  words.forEach(w=>{const hasV=w.some(l=>'AEIOU'.includes(l));w.forEach(l=>{const isV='AEIOU'.includes(l)||(l==='Y'&&(yv==='y'||(yv==='auto'&&!hasV)));(isV?v:c).push(l)})});return {v,c}}
+function numPyth(P,o){
+  const full=numNorm(P.full),parts=[P.fn,P.mn,P.ln].map(numNorm),L=full.letters,out={},vc=numVC(P.full,o.yv);
+  const all=numWord(L,NUM_PY),vv=numWord(vc.v,NUM_PY),cc=numWord(vc.c,NUM_PY);
+  out.exp={total:all.total,red:numRed(all.total,[11,22,33]),vals:all.vals};out.soul={total:vv.total,red:numRed(vv.total,[11,22,33])};out.pers={total:cc.total,red:numRed(cc.total,[11,22,33])};
+  out.parts=parts.map(p=>{const w=numWord(p.letters,NUM_PY);return {name:p.norm,total:w.total,red:numRed(w.total,[11,22,33])}});
+  const ini=parts.filter(p=>p.letters.length).map(p=>p.letters[0]),is=numSum(ini.map(l=>NUM_PY[l]));out.bal={ini,total:is,red:numRed(is,[11,22,33])};
+  const freq={};all.vals.forEach(v=>freq[v]=(freq[v]||0)+1);const mx=Math.max(0,...Object.values(freq));out.freq=freq;out.hidden=mx?Object.keys(freq).filter(k=>freq[k]===mx).map(Number):[];out.lessons=[1,2,3,4,5,6,7,8,9].filter(n=>!freq[n]);
+  const D=numDate(P.dob);
+  if(D){const rm=numRed(D.mo,[11,22,33]),rd=numRed(D.d,[11,22,33]),ry=numRed(numSum(numDigits(D.y)),[11,22,33]),comp=rm.n+rd.n+ry.n,all2=numSum(numDigits(D.d).concat(numDigits(D.mo),numDigits(D.y)));
+    out.lpC={rm,rd,ry,sum:comp,red:numRed(comp,[11,22,33])};out.lpA={sum:all2,red:numRed(all2,[11,22,33])};out.lp=o.lp==='all'?out.lpA:out.lpC;out.lpSum=out.lp.sum;
+    out.bday={raw:D.d,red:numRed(D.d,[11,22,33])};
+    out.karmic=[...new Set([...(NUM_KARMIC[D.d]?[D.d+'/'+NUM_KARMIC[D.d]]:[]),...numKarmic([out.lpSum]),...numKarmic([out.exp.total]),...numKarmic([out.soul.total]),...numKarmic([out.pers.total])])];
+    out.mat=numRed(out.lp.red.n+out.exp.red.n,[11,22,33]);out.bridge={lpExp:Math.abs(numRed(out.lp.red.n,[]).n-numRed(out.exp.red.n,[]).n),soulPers:Math.abs(numRed(out.soul.red.n,[]).n-numRed(out.pers.red.n,[]).n)};
+    const m=numRed(D.mo,[]).n,d=numRed(D.d,[]).n,y=numRed(numSum(numDigits(D.y)),[]).n,lps=numRed(out.lp.red.n,[]).n,e1=36-lps;
+    const p1=numRed(m+d,[11,22,33]),p2=numRed(d+y,[11,22,33]),p3=numRed(p1.n+p2.n,[11,22,33]),p4=numRed(m+y,[11,22,33]);
+    out.pin=[{n:p1,from:0,to:e1},{n:p2,from:e1+1,to:e1+9},{n:p3,from:e1+10,to:e1+18},{n:p4,from:e1+19,to:null}];
+    out.chal=[Math.abs(m-d),Math.abs(d-y),Math.abs(Math.abs(m-d)-Math.abs(d-y)),Math.abs(m-y)];out.age1=e1;out.base={m,d,y};
+  }
+  return out;
+}
+const NUM_ERA=['Formative / youth era','Productive / mastery era','Mature / harvest era','Elder / wisdom era'];
+function numStages(P,o,refISO){
+  const D=numDate(P.dob),R=numDate(refISO)||numDate(new Date().toISOString().slice(0,10));if(!D)return null;
+  const r=numPyth(P,o);if(!r.pin)return null;const age=R.y-D.y-((R.mo<D.mo||(R.mo===D.mo&&R.d<D.d))?1:0);
+  const list=r.pin.map((p,i)=>({i:i+1,era:NUM_ERA[i],from:p.from,to:p.to,y1:D.y+p.from,y2:p.to===null?null:D.y+p.to,pin:p.n,chal:r.chal[i],main:i===2,cur:age>=p.from&&(p.to===null||age<=p.to)}));
+  return {age,list,cur:list.find(x=>x.cur)||null,ref:R};
+}
+function numKua(y,g){const ys=numRed(numSum(numDigits(y)),[]).n;let k=numRed(g==='f'?4+ys:11-ys,[]).n;if(k===5)k=g==='f'?8:2;return k}
+function numLoShu(P,o){
+  const D=numDate(P.dob);if(!D)return null;
+  const pad=n=>String(n).padStart(2,'0'),ystr=o.ly==='two'?String(D.y).slice(-2):String(D.y),raw=(pad(D.d)+pad(D.mo)+ystr).split('').map(Number);
+  let ds=raw.slice();if(o.lz!=='y')ds=ds.filter(x=>x!==0);
+  const cnt={};for(let i=1;i<=9;i++)cnt[i]=0;ds.forEach(x=>{if(x>=1&&x<=9)cnt[x]++});
+  const mul=numRed(D.d,[]).n,bha=numRed(numSum(numDigits(D.d).concat(numDigits(D.mo),numDigits(D.y))),[]).n,kua=numKua(D.y,o.g),inj=[];
+  if(o.ld==='y'){inj.push(['Mulank',mul]);inj.push(['Bhagyank',bha])}
+  else if(o.ld==='vedic'){if(D.d>9&&![10,20,30].includes(D.d))inj.push(['Mulank',mul]);inj.push(['Bhagyank',bha])}
+  if(o.kua==='y')inj.push(['Kua',kua]);
+  inj.forEach(x=>cnt[x[1]]++);
+  const present=i=>cnt[i]>0,lines=NUM_LINES.map(l=>{const k=l[1].filter(present).length;return {name:l[0],nums:l[1],plane:l[2],key:l[3],meaning:l[4],emptyName:l[5],pct:Math.round(k/3*100),full:k===3,empty:k===0}});
+  return {raw,used:ds,cnt,mul,bha,kua,inj,derivedAdded:inj.length>0,lines,missing:[1,2,3,4,5,6,7,8,9].filter(i=>!cnt[i]),repeated:[1,2,3,4,5,6,7,8,9].filter(i=>cnt[i]>1),single:[1,2,3,4,5,6,7,8,9].filter(i=>cnt[i]===1)};
+}
+function numCls(a,b){
+  if(nms().ftab==='sup'){const r=NUM_FR_SUP[a];if(!r)return null;return r[0].includes(b)?'Friend':r[1].includes(b)?'Neutral':r[2].includes(b)?'Enemy':null}
+  const pa=NUM_PLANET[a],pb=NUM_PLANET[b];if(!NATF[pa]||!NATF[pb])return null;return mkRelP(pa,pb);
+}
+function numRel(a,b){
+  if(!a||!b)return {k:'–',t:'not available'};if(a===b)return {k:'Same',t:'same number'};
+  const x=numCls(a,b),y=numCls(b,a),sup=nms().ftab==='sup';
+  if(!x&&!y)return {k:'Pending',t:'RESEARCH PENDING – '+(sup?'pair not covered by the supplied table':'Rahu/Ketu friendships are not defined by the derived table')};
+  const t=a+'→'+b+': '+(x||'n/a')+' · '+b+'→'+a+': '+(y||'n/a');
+  if(!x||!y)return {k:(x||y)+' (one-way)',t};
+  return {k:x===y?x:(x==='Enemy'||y==='Enemy')?'Mixed':'Neutral',t};
+}
+function numFriends(n){const out={friend:[],neutral:[],enemy:[],pending:[]};for(let m=1;m<=9;m++){if(m===n)continue;const k=numRel(n,m).k;if(k==='Pending')out.pending.push(m);else if(k.startsWith('Friend'))out.friend.push(m);else if(k==='Enemy'||k==='Mixed'||k.startsWith('Enemy'))out.enemy.push(m);else out.neutral.push(m)}return out}
+function numFrAsym(){const out=[];for(let a=1;a<=9;a++)for(let b=a+1;b<=9;b++){const f=(x,y)=>{const r=NUM_FR_SUP[x];return r[0].includes(y)?'friend':r[1].includes(y)?'neutral':r[2].includes(y)?'enemy':'not covered'};if(f(a,b)!==f(b,a))out.push(a+'→'+b+' '+f(a,b)+' / '+b+'→'+a+' '+f(b,a))}return out}
+function numCycle(P,o,cdate){
+  const D=numDate(P.dob),C=numDate(cdate);if(!D||!C)return null;
+  let yr=C.y;if(o.py==='bday'){const passed=C.mo>D.mo||(C.mo===D.mo&&C.d>=D.d);if(!passed)yr=C.y-1}
+  const rm=numRed(D.mo,[]).n,rd=numRed(D.d,[]).n,ry=numRed(numSum(numDigits(yr)),[]).n,raw=rm+rd+ry,py=numRed(raw,[]),pm=numRed(py.n+C.mo,[]),pd=numRed(pm.n+C.d,[]);
+  const uy=numRed(numSum(numDigits(yr)),[11,22,33]),um=numRed(uy.n+C.mo,[11,22,33]),ud=numRed(um.n+C.d,[11,22,33]);
+  const nine=[];for(let k=0;k<9;k++){const y=yr+k,r=numRed(numSum(numDigits(y)),[]).n,t=rm+rd+r;nine.push({y,raw:t,n:numRed(t,[]).n})}
+  return {yr,py,pm,pd,rm,rd,ry,raw,uy,um,ud,nine,cycle:(yr-D.y)%9,C};
+}
+/* ---- supplied compatibility method (experimental) ---- */
+function numHarm(a,b){const r=NUM_HARM[numRed(a,[]).n],bb=numRed(b,[]).n;return r[0].includes(bb)?{score:95,status:'Natural harmony'}:r[1].includes(bb)?{score:72,status:'Neutral / adaptable'}:{score:45,status:'Dynamic friction'}}
+function numVedSc(a,b){const r=NUM_FR_SUP[a];if(!r)return {score:40,rel:'not covered'};return r[0].includes(b)?{score:95,rel:'Mitra (friendly)'}:r[1].includes(b)?{score:70,rel:'Sama (neutral)'}:r[2].includes(b)?{score:40,rel:'Shatru (inimical)'}:{score:40,rel:'pair not covered by the table – scored 40 as in the supplied method'}}
+const numTier=s=>s>=85?'soulmate_harmonic':s>=72?'dynamic_growth':s>=60?'karmic_catalyst':'challenging_friction';
+function numCompatSup(A,B){
+  if(!A.py.lp||!B.py.lp||!A.ve.mul||!B.ve.mul||!A.ls||!B.ls)return null;
+  const q=(k)=>numHarm(A.py[k].red.n,B.py[k].red.n),lp=numHarm(A.py.lp.red.n,B.py.lp.red.n),su=q('soul'),de=q('exp'),pe=q('pers');
+  const west=lp.score*.4+su.score*.3+de.score*.2+pe.score*.1,ved=numVedSc(A.ve.mul.n,B.ve.mul.n);
+  const mA=A.ls.missing,mB=B.ls.missing,aFills=mB.filter(n=>!mA.includes(n)),bFills=mA.filter(n=>!mB.includes(n)),both=mA.filter(n=>mB.includes(n)),gaps=mA.length+mB.length;
+  const ls=Math.max(50,gaps?Math.round((aFills.length+bFills.length)/gaps*100):100);
+  const comp=numRed(numRed(A.py.lp.red.n,[]).n+numRed(B.py.lp.red.n,[]).n,[11,22,33]).n,overall=Math.round((west*.5+ved.score*.3+ls*.2)*10)/10,tier=numTier(overall);
+  return {lp,su,de,pe,west:Math.round(west*10)/10,ved,ls,aFills,bFills,both,comp,overall,tier};
+}
+/* ---- spelling explorer (supplied method; mechanical letter changes only) ---- */
+function numOptimize(name,sys,tr,tc,max){
+  const map=sys==='pythagorean'?NUM_PY:NUM_CH,keep=sys==='pythagorean'?[11,22,33]:[],sum=s=>numSum([...numNorm(s).norm].map(l=>map[l]||0));
+  const cur=numNorm(name).norm,cs=sum(name),want=tc&&tc.length?tc:(sys==='chaldean'&&!(tr&&tr.length)?NUM_AUSP:[]),words=String(name).trim().split(/\s+/).filter(Boolean),cand=new Set();
+  words.forEach((w,wi)=>{[...w].forEach((ch,ci)=>{if(/[A-Za-z]/.test(ch)){const t=w.slice(0,ci+1)+ch+w.slice(ci+1);cand.add(words.slice(0,wi).concat([t],words.slice(wi+1)).join(' '))}});
+    ['a','e','i','h','n','s','y'].forEach(e=>{if(!w.toLowerCase().endsWith(e))cand.add(words.slice(0,wi).concat([w+e],words.slice(wi+1)).join(' '))})});
+  const hits=[];[...cand].sort().forEach(c=>{const n=numNorm(c).norm;if(n===cur)return;const t=sum(c),r=numRed(t,keep).n;if((want.length&&want.includes(t))||(tr&&tr.length&&tr.includes(r)))hits.push({name:c,total:t,root:r,ausp:NUM_AUSP.includes(t),dist:Math.abs(n.length-cur.length),meaning:NUM_INT.comp[t]||''})});
+  hits.sort((a,b)=>(a.ausp?0:1)-(b.ausp?0:1)||a.dist-b.dist||a.total-b.total);
+  return {cur:{name,total:cs,root:numRed(cs,keep).n,ausp:NUM_AUSP.includes(cs),meaning:NUM_INT.comp[cs]||''},want,tr:tr||[],list:hits.slice(0,max||10),count:hits.length};
+}
+const numList=s=>String(s||'').split(/[,\s]+/).map(Number).filter(n=>Number.isInteger(n)&&n>0);
+/* ---- rule register additions ---- */
+NUM_RULES.forEach(r=>{if(r.id==='NUM_CH_003'){r.rule='Compound-number (10–52) interpretation database – 18 compound meanings supplied (see NUM_CH_004); remaining compounds not available';r.status='Partial – RESEARCH PENDING for the rest'}if(r.id==='NUM_CM_001'){r.rule='Default compatibility is qualitative (same numbers, derived planetary friendship, Lo Shu overlap). A numeric index exists only as the optional supplied method NUM_CM_002';r.status='Default enforced; numeric index optional'}if(r.id==='NUM_LS_004'){r.rule='Plane labels supplied: Mental, Emotional, Practical, Thought, Willpower, Action; diagonals Golden Yog (4-5-6) and Silver Yog (2-5-8); empty-diagonal names Arrow of Confusion / Frustration';r.source='Supplied by the Product Owner (AI-generated text); naming varies by author; not verified';r.status='Supplied – unverified (selectable)'}});
+const NUM_SUP='Supplied by the Product Owner (pasted AI-generated specification); not independently verified';
+NUM_RULES.push(...[
+ ['NUM_PY_010','Pythagorean','Y as a vowel only in a name part that has no other vowel (Lynn, Sky) – simplified syllable rule','Variant',NUM_SUP,'Supplied – selectable'],
+ ['NUM_PY_011','Pythagorean','Harmony matrix (natural / neutral / friction pairs 1–9) used by the supplied compatibility method; the matrix is not symmetric for every pair','Table',NUM_SUP,'Supplied – unverified'],
+ ['NUM_PY_012','Pythagorean','Universal Year / Month / Day (digits of the year, then month, then day) and a nine-year forecast of Personal Years','Formula',NUM_SUP,'Supplied – selectable'],
+ ['NUM_VE_006','Vedic','Number friendship table 1–9 (friend / neutral / enemy) including Rahu (4) and Ketu (7). Not symmetric for every pair; 5→5 and 9→7 are not covered','Table',NUM_SUP,'Supplied – unverified'],
+ ['NUM_LS_005','Lo Shu','Vedic injection: Mulank added to the grid only when the birth day is two-digit and not 10/20/30; Bhagyank always added','Formula',NUM_SUP,'Supplied – selectable'],
+ ['NUM_LS_006','Lo Shu','Kua number (11 − digit-root of year for males, 4 + digit-root for females; 5 becomes 2 male / 8 female). Checked to equal the standard Kua formula for years 1900–2099. Kua is a Chinese Feng Shui concept, not a classical Indian numerology number','Formula',NUM_SUP,'Supplied – selectable (off by default)'],
+ ['NUM_CH_004','Chaldean','Auspicious compound list 10, 14, 15, 19, 21, 23, 24, 27, 32, 33, 37, 41, 42, 45, 46, 50, 51, 52 with short meanings. Practitioner lists differ; 14, 16, 19 also appear as karmic debts','Table',NUM_SUP,'Supplied – disputed between authors'],
+ ['NUM_CM_002','Compatibility','Weighted index: Pythagorean pairs 50% (Life Path 40, Soul Urge 30, Expression 20, Personality 10), Vedic Mulank friendship 30%, Lo Shu gap-filling 20% (floor 50); tiers at 85 / 72 / 60','Method',NUM_SUP+'; weights and tables have no documented origin','Supplied – experimental, off by default'],
+ ['NUM_NM_001','Names','Spelling explorer: doubles a letter or appends a, e, i, h, n, s or y, then lists spellings whose total or root hits the chosen targets. Mechanical only; no claim that a spelling changes fortune','Method',NUM_SUP,'Supplied – exploratory'],
+ ['NUM_IN_002','Interpretation','Archetype, karmic-debt, plane, transit, challenge, compound and compatibility wording (the interpretation layer)','Interpretation','Modern / commercial wording supplied by the Product Owner; kept separate from the calculation engine','Supplied – unverified; can be switched off']
+].map(r=>({id:r[0],stream:r[1],rule:r[2],kind:r[3],source:r[4],status:r[5],version:'1.0'})));
+const numSrc=id=>{const r=NUM_RULES.find(x=>x.id===id);return r?r.status:'–'};
+const numRuleClass=r=>/PENDING/i.test(r.status)||/PENDING/i.test(r.rule)?'Pending':/Supplied/i.test(r.status)?'Supplied':/Disputed|selectable|Variant|Derived/i.test(r.status)?'Variant':'Standard';
+/* ---- tab renderers (replacements) ---- */
+const numI=o=>o.int==='y';
+const numTag=t=>`<span class="tag" style="font-size:11px">${t}</span>`;
+function numTabPy(P,o,A){
+  const r=A.py,L=numNorm(P.full).letters,lt=L.map(l=>l+'='+NUM_PY[l]).join(' '),ynote=o.yv==='y'?'Y counted as a vowel':o.yv==='auto'?'Y a vowel only in a name part with no other vowel':'Y counted as a consonant';
+  const c=[numCard('Expression / Destiny',r.exp.red.n,r.exp.total+' → '+r.exp.red.text,'Letters: '+lt+'<br>Sum '+r.exp.total+' · '+r.exp.red.text),numCard('Soul Urge',r.soul.red.n,r.soul.total+' → '+r.soul.red.text,'Vowels ('+ynote+') total '+r.soul.total),numCard('Personality',r.pers.red.n,r.pers.total+' → '+r.pers.red.text,'Consonants total '+r.pers.total),numCard('Balance',r.bal.red.n,'initials '+r.bal.ini.join(' ')+' = '+r.bal.total,'')];
+  if(r.lp){c.unshift(numCard('Life Path',r.lp.red.n,(o.lp==='all'?'all digits = ':'components '+r.lpC.rm.n+' + '+r.lpC.rd.n+' + '+r.lpC.ry.n+' = ')+r.lpSum+' → '+r.lp.red.text,'Variant A (component-wise): '+r.lpC.rm.text+' (month), '+r.lpC.rd.text+' (day), '+r.lpC.ry.text+' (year) → '+r.lpC.sum+' → '+r.lpC.red.text+'<br>Variant B (all digits): '+r.lpA.sum+' → '+r.lpA.red.text));c.push(numCard('Birthday number',r.bday.red.n,'day '+r.bday.raw+' → '+r.bday.red.text,''),numCard('Maturity',r.mat.n,'Life Path + Expression',''))}
+  const st=r.pin?numStages(P,o,nms().cdate||''):null;
+  const pin=st?`<h4 style="margin:12px 0 4px">Pinnacles and challenges <span class="mute" style="font-weight:400">(age ${st.age} on ${st.ref.str||''})</span></h4><div style="overflow-x:auto"><table style="font-size:13px"><tr><th>Cycle</th><th>Era</th><th>Age</th><th>Years</th><th>Pinnacle</th><th>Challenge</th>${numI(o)?'<th>Wording</th>':''}</tr>${st.list.map(x=>`<tr style="${x.cur?'background:var(--acc2);font-weight:700':''}"><td>${x.i}${x.cur?' ◀ now':''}</td><td>${x.era}</td><td>${x.from}–${x.to===null?'end':x.to}</td><td>${x.y1}–${x.y2===null?'':x.y2}</td><td>${x.pin.n} <span class="mute">(${x.pin.text})</span></td><td>${x.chal}${x.main?' (main)':''}</td>${numI(o)?`<td class="mute" style="font-size:12px;font-weight:400">${esc(NUM_INT.core[x.pin.n]?NUM_INT.core[x.pin.n][0]:'')}; ${esc(NUM_INT.chal[x.chal]||'')}</td>`:''}</tr>`).join('')}</table></div><p class="mute" style="margin:4px 0 0">First pinnacle ends at age 36 − single-digit Life Path (${r.age1}). Components are single digits; pinnacle sums keep 11/22/33; challenges are absolute differences (0–8). Conventions vary (NUM_PY_008). The “now” row uses the reference date set in the Cycles tab (today by default).</p>`:'';
+  const kd=r.karmic&&r.karmic.length?r.karmic.map(k=>{const n=+k.split('/')[0];return k+(numI(o)&&NUM_INT.karmic[n]?' – '+esc(NUM_INT.karmic[n]):'')}).join('<br>'):'none found';
+  const kw=[r.lp&&['Life Path',r.lp.red.n],['Expression',r.exp.red.n],['Soul Urge',r.soul.red.n]].filter(Boolean);
+  return `${numGrid(c)}<div class="card" style="margin-top:10px"><table style="font-size:13px"><tr><td class="mute" style="width:200px">Karmic debt numbers</td><td>${kd} <span class="mute">(compound seen before reduction in birth day, Life Path sum, name totals)</span></td></tr>
+   <tr><td class="mute">Hidden passion (most frequent)</td><td>${r.hidden.join(', ')||'–'}</td></tr><tr><td class="mute">Karmic lessons (missing from name)</td><td>${r.lessons.join(', ')||'none'}</td></tr>
+   ${r.bridge?`<tr><td class="mute">Bridge numbers</td><td>Life Path ↔ Expression: ${r.bridge.lpExp} · Soul Urge ↔ Personality: ${r.bridge.soulPers} <span class="mute">(difference of single-digit roots)</span></td></tr>`:''}
+   <tr><td class="mute">Name parts</td><td>${r.parts.map(p=>p.name?p.name+' = '+p.total+' → '+p.red.n:'').filter(Boolean).join(' · ')||'–'}</td></tr></table>${pin}
+   ${numI(o)?`<div style="margin-top:8px;font-size:13px"><b>Wording</b> <span class="mute">(${NUM_INTNOTE})</span><ul style="margin:4px 0 0 18px">${kw.map(([l,n])=>`<li>${l} ${n}: ${esc(numArch(n))}</li>`).join('')}</ul></div>`:''}</div>`;
+}
+function numTabCh(P,o,A){
+  const r=A.ch,L=numNorm(P.full).letters,comp=NUM_INT.comp[r.name.total];
+  const c=[numCard('Name number (compound / root)',r.name.total+' / '+r.name.red.n,r.name.red.text,'Letters: '+L.map(l=>l+'='+NUM_CH[l]).join(' ')+'<br>The compound number '+r.name.total+' is kept with its root.'),numCard('Vowels',r.vow.total+' / '+r.vow.red.n,'',''),numCard('Consonants',r.con.total+' / '+r.con.red.n,'','')];
+  if(r.birth)c.push(numCard('Birth number (day)',r.birth.red.n,'day '+r.birth.raw,''),numCard('Destiny (full date)',r.dest.total+' / '+r.dest.red.n,r.dest.red.text,''));
+  return `${numGrid(c)}<div class="card" style="margin-top:10px"><table style="font-size:13px"><tr><td class="mute" style="width:200px">First / middle / surname</td><td>${r.parts.map(p=>p.name?p.name+' = '+p.total+'/'+p.red.n:'').filter(Boolean).join(' · ')||'–'}</td></tr>
+   <tr><td class="mute">Compound ${r.name.total}</td><td>${NUM_AUSP.includes(r.name.total)?'<span class="ok">in the supplied auspicious list</span>':'not in the supplied auspicious list'} ${numI(o)?(comp?'– '+esc(comp):'– no wording for this compound (RESEARCH PENDING)'):''}</td></tr></table>
+   <p class="mute" style="margin:8px 0 0">The Chaldean alphabet gives no value of 9 to any letter. Only 18 compound meanings were supplied (NUM_CH_004); the other compounds are RESEARCH PENDING. ${numI(o)?NUM_INTNOTE:''}</p></div>`;
+}
+function numTabVe(P,o,A){
+  const r=A.ve,c=[],sup=o.ftab==='sup';
+  if(r.mul)c.push(numCard('Mulank (मूलांक)',r.mul.n,numPl(r.mul.n)+' · day',''),numCard('Bhagyank (भाग्यांक)',r.bha.red.n,numPl(r.bha.red.n)+' · '+r.bha.total+' → '+r.bha.red.text,''));
+  c.push(numCard('Namank (नामांक)',r.nam.red.n,numPl(r.nam.red.n)+' · '+r.nam.total+' ('+r.nam.sys+' mapping)',''));
+  const rows=[1,2,3,4,5,6,7,8,9].map(n=>{const f=numFriends(n);return `<tr><td><b>${n}</b></td><td>${NUM_PLANET[n]}</td><td class="mute" style="font-size:12px">${NUM_PLANET_SIG[NUM_PLANET[n]]}</td><td class="ok">${f.friend.join(', ')||'–'}</td><td>${f.neutral.join(', ')||'–'}</td><td class="bad">${f.enemy.join(', ')||'–'}</td><td class="mute">${f.pending.join(', ')||''}</td></tr>`}).join('');
+  const my=[r.mul&&r.mul.n,r.bha&&r.bha.red.n,r.nam.red.n].filter(Boolean);
+  return `${numGrid(c)}<div class="card" style="margin-top:10px"><p class="mute" style="margin:0 0 6px">Psychic number = Mulank; Destiny number = Bhagyank; Driver = Mulank and Conductor = Bhagyank in common Indian usage (conventions differ between schools). Namank mapping: ${o.vs==='py'?'Pythagorean':'Chaldean'}. Friendship table in use: <b>${sup?'supplied table (unverified)':'derived from planetary friendship'}</b> – change it in the method settings.</p>
+   <div style="overflow-x:auto"><table style="font-size:13px"><tr><th>No.</th><th>Planet</th><th>Planetary significations (Jyotish)</th><th>Friendly</th><th>Neutral</th><th>Inimical / mixed</th><th>Pending</th></tr>${rows}</table></div>
+   <p class="mute" style="margin:6px 0 0">${sup?'The supplied table is not symmetric for every pair ('+numFrAsym().length+' pairs differ by direction) and does not cover 5→5 and 9→7 (NUM_VE_006). Pairs are shown as the result of both directions.':'The derived table comes from the natural friendship of the mapped planets used elsewhere in this app (NUM_VE_004); Rahu (4) and Ketu (7) are left pending.'} Lucky and unfavourable number tables of individual schools are RESEARCH PENDING (NUM_VE_005).</p>
+   ${my.length?`<p style="margin:6px 0 0"><b>Your numbers and their friends:</b> ${[...new Set(my)].map(n=>n+' ('+NUM_PLANET[n]+'): friends '+(numFriends(n).friend.join(', ')||'–')).join(' · ')}</p>`:''}</div>`;
+}
+function numTabLs(P,o,A){
+  const g=A.ls;if(!g)return '<div class="card">Enter a valid date of birth to build the Lo Shu grid.</div>';
+  const cell=n=>`<div style="border:1px solid var(--line);border-radius:8px;padding:10px 0;text-align:center;background:${g.cnt[n]?'var(--acc2)':'var(--bg)'}"><div style="font-size:11px" class="mute">${n}</div><div style="font-size:22px;font-weight:800;min-height:28px;color:var(--acc)">${g.cnt[n]?String(n).repeat(g.cnt[n]):'·'}</div></div>`;
+  const gr=`<div style="display:grid;grid-template-columns:repeat(3,70px);gap:6px">${NUM_LOSHU.flat().map(cell).join('')}</div>`,lab=o.ll==='common',I=numI(o);
+  const lines=g.lines.map(l=>{const st=l.full?'<span class="ok">complete</span>'+(l.key.endsWith('yog')&&lab?' – '+esc(l.plane):''):l.empty?'<span class="bad">empty</span>'+(l.emptyName&&lab?' – '+esc(l.emptyName):''):'partial';
+    return `<tr><td>${l.name}</td><td>${lab?esc(l.plane):'–'}</td><td>${l.pct}%</td><td>${st}</td><td class="mute" style="font-size:12px">${lab?esc(l.meaning):''}${I&&lab?' · '+esc(NUM_INT.planes[l.key]):''}</td></tr>`}).join('');
+  return `<div class="card"><div class="row" style="align-items:flex-start;gap:24px"><div>${gr}<p class="mute" style="margin:6px 0 0">Layout 4 9 2 / 3 5 7 / 8 1 6 (baseline).</p></div>
+   <div style="flex:1;min-width:260px"><table style="font-size:13px"><tr><td class="mute" style="width:170px">Digits used</td><td>${g.used.join(' ')||'–'} <span class="mute">(${o.lz==='y'?'zero kept – it has no cell':'zero ignored'}; ${o.ly==='two'?'last two digits of the year':'full year'})</span></td></tr>
+   <tr><td class="mute">Missing numbers</td><td>${g.missing.join(', ')||'none'}</td></tr><tr><td class="mute">Repeated numbers</td><td>${g.repeated.map(n=>n+' ×'+g.cnt[n]).join(', ')||'none'}</td></tr><tr><td class="mute">Single occurrences</td><td>${g.single.join(', ')||'none'}</td></tr>
+   <tr><td class="mute">Derived numbers</td><td>Mulank ${g.mul}, Bhagyank ${g.bha}, Kua ${g.kua}${o.g==='f'?' (female)':' (male)'} – ${g.inj.length?'<b>added to the grid:</b> '+g.inj.map(x=>x[0]+' '+x[1]).join(', '):'shown here only; not added to the grid'}</td></tr></table></div></div>
+   <h4 style="margin:12px 0 4px">Arrows and planes</h4><div style="overflow-x:auto"><table style="font-size:13px"><tr><th>Line</th><th>Plane label</th><th>Complete</th><th>Status</th><th>Meaning</th></tr>${lines}</table></div>
+   <p class="mute" style="margin:6px 0 0">A complete arrow has all three numbers present; an empty arrow has none; partial = 33% or 67%. Plane labels, Yog names and meanings were supplied by the Product Owner (NUM_LS_004) and naming varies by author. Injection of Mulank, Bhagyank and Kua is optional (NUM_LS_005/006); Kua is a Chinese Feng Shui number, not a classical Indian numerology number. ${I?NUM_INTNOTE:''}</p></div>`;
+}
+function numTabCycles(P,o,A){
+  const s=nms(),cd=s.cdate||new Date().toISOString().slice(0,10),cy=numCycle(P,o,cd),I=numI(o);
+  const head=`<div class="card"><div class="row"><b>Personal cycles</b><label style="display:inline;margin:0 0 0 auto">Reference date <input type="date" value="${cd}" onchange="numSet('cdate',this.value)"></label><label style="display:inline;margin:0">Year convention <select onchange="numSet('py',this.value)">${opt([['cal','Calendar year'],['bday','Birthday to birthday']],s.py)}</select></label></div></div>`;
+  if(!cy)return head+'<div class="card mute">Enter a valid date of birth.</div>';
+  const g=n=>I&&NUM_INT.transits[n]?'<br>'+esc(NUM_INT.transits[n]):'';
+  return head+`<div class="card">${numGrid([numCard('Personal Year',cy.py.n,cy.rm+' + '+cy.rd+' + '+cy.ry+' (year '+cy.yr+') = '+cy.raw+' → '+cy.py.text,g(cy.py.n)),numCard('Personal Month',cy.pm.n,cy.py.n+' + month '+cy.C.mo+' → '+cy.pm.text,g(cy.pm.n)),numCard('Personal Day',cy.pd.n,cy.pm.n+' + day '+cy.C.d+' → '+cy.pd.text,g(cy.pd.n))])}
+   <h4 style="margin:12px 0 4px">Universal cycle (the same for everyone)</h4><table style="font-size:13px"><tr><td class="mute" style="width:200px">Universal Year ${cy.yr}</td><td>${cy.uy.text}</td></tr><tr><td class="mute">Universal Month</td><td>${cy.uy.n} + ${cy.C.mo} → ${cy.um.text}</td></tr><tr><td class="mute">Universal Day</td><td>${cy.um.n} + ${cy.C.d} → ${cy.ud.text}</td></tr></table>
+   <h4 style="margin:12px 0 4px">Nine-year view of Personal Years</h4><div style="overflow-x:auto"><table style="font-size:13px"><tr><th>Year</th><th>Sum</th><th>Personal Year</th>${I?'<th>Wording</th>':''}</tr>${cy.nine.map((x,i)=>`<tr style="${i?'':'background:var(--acc2)'}"><td>${x.y}</td><td>${x.raw}</td><td>${x.n}${(x.raw===11||x.raw===22)?' <span class="mute">(raw '+x.raw+' – master in some schools)</span>':''}</td>${I?`<td class="mute" style="font-size:12px">${esc(NUM_INT.transits[x.n]||'')}</td>`:''}</tr>`).join('')}</table></div>
+   <p class="mute" style="margin:8px 0 0">Personal Year = reduced month + reduced day + reduced year (NUM_PY_009); Month and Day follow. Universal cycles and the nine-year view are NUM_PY_012 (supplied). The Vedic Varshank is the same digital root. ${I?NUM_INTNOTE:''}</p></div>`;
+}
+function numCompat(PA,PB,o){
+  const A=numAll(PA,o),B=numAll(PB,o),row=(l,a,b)=>{const r=(typeof a==='number'&&typeof b==='number')?numRel(a,b):{k:'–',t:''};return `<tr><td>${l}</td><td>${a===undefined||a===null?'–':a}</td><td>${b===undefined||b===null?'–':b}</td><td>${a===b&&a!==undefined&&a!==null?'<b>same</b>':(r.k!=='–'?r.k+' <span class="mute" style="font-size:12px">'+r.t+'</span>':'')}</td></tr>`};
+  const g1=A.ls,g2=B.ls;
+  const ls=g1&&g2?`<tr><td>Lo Shu – numbers A lacks that B has</td><td colspan="3">${g1.missing.filter(n=>g2.cnt[n]>0).join(', ')||'none'}</td></tr><tr><td>Lo Shu – numbers B lacks that A has</td><td colspan="3">${g2.missing.filter(n=>g1.cnt[n]>0).join(', ')||'none'}</td></tr><tr><td>Lo Shu – numbers both lack</td><td colspan="3">${g1.missing.filter(n=>g2.missing.includes(n)).join(', ')||'none'}</td></tr>`:'';
+  let sup='';
+  if(o.cmpm==='sup'){const c=numCompatSup(A,B);
+    sup=c?`<div class="card" style="border-left:4px solid var(--warn);margin-top:10px"><b>Supplied weighted method (experimental)</b> ${numTag('NUM_CM_002')}<p class="mute" style="margin:4px 0">The weights (50 / 30 / 20 and 40 / 30 / 20 / 10), the pair tables and the tier cut-offs were supplied by the Product Owner and have no documented origin. The figure is an index of those tables, not a prediction or a measure of the relationship.</p>
+     <table style="font-size:13px"><tr><th>Part</th><th>Pair</th><th>Score</th><th>Reading</th></tr>
+     <tr><td>Life Path (40%)</td><td>${A.py.lp.red.n} / ${B.py.lp.red.n}</td><td>${c.lp.score}</td><td>${c.lp.status}</td></tr><tr><td>Soul Urge (30%)</td><td>${A.py.soul.red.n} / ${B.py.soul.red.n}</td><td>${c.su.score}</td><td>${c.su.status}</td></tr><tr><td>Expression (20%)</td><td>${A.py.exp.red.n} / ${B.py.exp.red.n}</td><td>${c.de.score}</td><td>${c.de.status}</td></tr><tr><td>Personality (10%)</td><td>${A.py.pers.red.n} / ${B.py.pers.red.n}</td><td>${c.pe.score}</td><td>${c.pe.status}</td></tr>
+     <tr><td><b>Western part (weight 50%)</b></td><td></td><td><b>${c.west}</b></td><td></td></tr><tr><td><b>Vedic Mulank (weight 30%)</b></td><td>${A.ve.mul.n} / ${B.ve.mul.n}</td><td><b>${c.ved.score}</b></td><td>${c.ved.rel}</td></tr>
+     <tr><td><b>Lo Shu gap-filling (weight 20%)</b></td><td>A supplies ${c.aFills.join(',')||'–'} · B supplies ${c.bFills.join(',')||'–'}</td><td><b>${c.ls}</b></td><td>shared gaps: ${c.both.join(', ')||'none'}</td></tr>
+     <tr><td><b>Overall index</b></td><td>composite number ${c.comp}</td><td><b>${c.overall}</b></td><td>${c.tier.replace('_',' ')}${numI(o)?' – '+esc(NUM_INT.tiers[c.tier])+(NUM_INT.themes[c.comp]?'<br>'+esc(NUM_INT.themes[c.comp]):''):''}</td></tr></table></div>`:'<div class="card mute" style="margin-top:10px">The supplied method needs both dates of birth.</div>'}
+  return `<table style="font-size:13px"><tr><th>Number</th><th>${esc(PA.fn||'Person A')}</th><th>${esc(PB.fn||'Person B')}</th><th>Relation</th></tr>
+   ${row('Mulank',A.ve.mul&&A.ve.mul.n,B.ve.mul&&B.ve.mul.n)}${row('Bhagyank',A.ve.bha&&A.ve.bha.red.n,B.ve.bha&&B.ve.bha.red.n)}${row('Namank',A.ve.nam.red.n,B.ve.nam.red.n)}
+   ${row('Pythagorean Life Path',A.py.lp&&A.py.lp.red.n,B.py.lp&&B.py.lp.red.n)}${row('Pythagorean Expression',A.py.exp.red.n,B.py.exp.red.n)}${row('Chaldean name root',A.ch.name.red.n,B.ch.name.red.n)}${ls}</table>${sup}`;
+}
+function numTabCompat(P,o,A){
+  const s=nms();let PB={fn:'',mn:'',ln:'',full:'',dob:''};const cB=S.charts.find(c=>c.id===s.pb);
+  if(cB){const nm=String(cB.name||'').replace(/\s*\([^)]*\)\s*/g,' ').trim(),p=nm.split(/\s+/);PB={fn:p[0]||'',mn:p.length>2?p.slice(1,-1).join(' '):'',ln:p.length>1?p[p.length-1]:'',full:nm,dob:cB.date}}
+  const opts=[['','— choose a saved horoscope —']].concat(S.charts.map(c=>[c.id,c.name]));
+  return `<div class="card"><div class="row"><b>Compatibility</b><label style="display:inline;margin:0">Person B <select onchange="numUseChart(this.value,'B')">${opt(opts,s.pb||'')}</select></label><label style="display:inline;margin:0">Context <select onchange="numSet('rel',this.value)">${opt([['marriage','Marriage'],['business','Business partnership'],['professional','Professional partnership'],['friendship','Friendship']],s.rel)}</select></label><label style="display:inline;margin:0">Method <select onchange="numSet('cmpm',this.value)">${opt([['qual','Qualitative only (default)'],['sup','Add supplied weighted index (experimental)']],s.cmpm)}</select></label></div>
+   <p class="mute" style="margin:6px 0 0">Person A is the person in the inputs. The default comparison is qualitative: same numbers, friendship (${s.ftab==='sup'?'supplied table':'derived'}) and Lo Shu overlap. The optional weighted index is NUM_CM_002 and is unverified. The context only labels the report.</p></div>
+   ${cB?`<div class="card"><b>${esc(s.rel[0].toUpperCase()+s.rel.slice(1))} comparison</b>${numCompat(P,PB,o)}</div>`:'<div class="card mute">Choose Person B from your saved horoscopes.</div>'}`;
+}
+function numTabNames(P,o,A){
+  const s=nms(),list=[['Full name',s.full||P.full]].concat(String(s.alts||'').split(/\n/).map(x=>x.trim()).filter(Boolean).slice(0,10).map((x,i)=>['Alternative '+(i+1),x]));
+  const base=A.ve.mul?[A.ve.mul.n,A.ve.bha.red.n]:[];
+  const rows=list.map(([l,nm])=>{const Q=Object.assign({},P,{full:nm,fn:'',mn:'',ln:''}),py=numPyth(Q,o),ch=numChal(Q,o),ve=numVedic(Q,o),n=numNorm(nm);
+    const rel=base.length?base.map(b=>numRel(b,ve.nam.red.n).k).join(' / '):'–';
+    return `<tr><td>${l}</td><td translate="no">${esc(nm)}${n.scripts.length?' <span class="bad">script – not mapped</span>':''}</td><td>${n.letters.length?py.exp.total+' → <b>'+py.exp.red.n+'</b>':'–'}</td><td>${n.letters.length?ch.name.total+' / <b>'+ch.name.red.n+'</b>':'–'}</td><td>${n.letters.length?'<b>'+ve.nam.red.n+'</b> ('+numPl(ve.nam.red.n)+')':'–'}</td><td>${rel}</td></tr>`}).join('');
+  const oname=s.ox||s.full||P.full,tr=numList(s.ot),tc=numList(s.otc),ex=numNorm(oname).letters.length?numOptimize(oname,s.osys,tr,tc,10):null;
+  const exp=`<div class="card"><b>Spelling explorer</b> ${numTag('NUM_NM_001')}<p class="mute" style="margin:4px 0 6px">Lists spellings made by doubling one letter or adding a, e, i, h, n, s or y to a name part, whose total or root hits the targets you choose. It is a mechanical exploration. It does not claim that a spelling changes fortune, and the name remains the person's own decision.</p>
+   <div class="row" style="gap:8px 12px"><label style="margin:0">Name or brand<br><input value="${esc(s.ox)}" placeholder="${esc(s.full||P.full||'name')}" style="width:220px" onchange="numSet('ox',this.value)"></label><label style="margin:0">System<br><select onchange="numSet('osys',this.value)">${opt([['chaldean','Chaldean'],['pythagorean','Pythagorean']],s.osys)}</select></label><label style="margin:0">Target roots (e.g. 1,5,6)<br><input value="${esc(s.ot)}" style="width:110px" onchange="numSet('ot',this.value)"></label><label style="margin:0">Target compounds (blank = supplied auspicious list for Chaldean)<br><input value="${esc(s.otc)}" style="width:200px" placeholder="19, 23, 24" onchange="numSet('otc',this.value)"></label></div>
+   ${ex?`<p style="margin:8px 0 4px">Current: <b>${esc(ex.cur.name)}</b> = ${ex.cur.total} → root ${ex.cur.root}${ex.cur.ausp?' (in the supplied auspicious list)':''}${numI(o)&&ex.cur.meaning?' – '+esc(ex.cur.meaning):''}</p>${ex.list.length?`<div style="overflow-x:auto"><table style="font-size:13px"><tr><th>Spelling</th><th>Compound</th><th>Root</th><th>Auspicious list</th>${base.length?'<th>Relation to Mulank / Bhagyank</th>':''}${numI(o)?'<th>Wording</th>':''}</tr>${ex.list.map(h=>`<tr><td translate="no"><b>${esc(h.name)}</b></td><td>${h.total}</td><td>${h.root}</td><td>${h.ausp?'yes':'–'}</td>${base.length?'<td>'+base.map(b=>numRel(b,h.root).k).join(' / ')+'</td>':''}${numI(o)?'<td class="mute" style="font-size:12px">'+esc(h.meaning)+'</td>':''}</tr>`).join('')}</table></div><p class="mute" style="margin:4px 0 0">${ex.count} matching spellings found; first ${ex.list.length} shown.</p>`:'<p class="mute">No spelling of this kind reaches the targets.</p>'}`:'<p class="mute">Enter a name.</p>'}</div>`;
+  return `<div class="card"><b>Name comparison</b> <span class="mute">(up to 10 alternative spellings, one per line)</span><textarea style="min-height:90px;margin-top:6px" onchange="numSet('alts',this.value)" placeholder="Anoop Shukla&#10;Anup Shukla">${esc(s.alts||'')}</textarea></div>
+   <div class="card"><div style="overflow-x:auto"><table style="font-size:13px"><tr><th></th><th>Name</th><th>Pythagorean expression</th><th>Chaldean compound / root</th><th>Vedic Namank</th><th>Relation to Mulank / Bhagyank</th></tr>${rows}</table></div>
+   <p class="mute" style="margin:6px 0 0">This table compares values; it does not rank names and no “best name” is claimed.</p></div>${exp}`;
+}
+/* ---- information flow, queries, summary ---- */
+function numFound(P,o,A){
+  const on=o.on,f=[],has=numNorm(P.full).letters.length>0;
+  if(on.py){if(A.py.lp)f.push(['Pythagorean Life Path',A.py.lp.red.n]);if(has)f.push(['Pythagorean Expression',A.py.exp.red.n])}
+  if(on.ch){if(has)f.push(['Chaldean name root',A.ch.name.red.n]);if(A.ch.birth)f.push(['Chaldean birth number',A.ch.birth.red.n]);if(A.ch.dest)f.push(['Chaldean destiny',A.ch.dest.red.n])}
+  if(on.ve){if(A.ve.mul){f.push(['Mulank',A.ve.mul.n]);f.push(['Bhagyank',A.ve.bha.red.n])}if(has)f.push(['Namank',A.ve.nam.red.n])}
+  if(on.kb&&A.kb&&A.kb.items.length)f.push(['Hechrechi (reduced)',A.kb.hechRed.n]);
+  const by={};f.forEach(([l,n])=>{(by[n]=by[n]||[]).push(l)});return {f,by};
+}
+function numSens(P,o){
+  const out=[],has=numNorm(P.full).letters.length>0,mk=k=>Object.assign({},o,k);
+  const a=numPyth(P,mk({lp:'comp'})),b=numPyth(P,mk({lp:'all'}));
+  if(a.lp&&a.lp.red.n!==b.lp.red.n)out.push(['Pythagorean Life Path','component-wise '+a.lp.red.n,'all digits '+b.lp.red.n,'NUM_PY_003 / 004']);
+  if(has){const y=['n','y','auto'].map(v=>numPyth(P,mk({yv:v})));
+    if(new Set(y.map(x=>x.soul.red.n)).size>1)out.push(['Soul Urge','Y consonant '+y[0].soul.red.n+' · Y vowel '+y[1].soul.red.n+' · auto '+y[2].soul.red.n,'','NUM_PY_006 / 010']);
+    if(new Set(y.map(x=>x.pers.red.n)).size>1)out.push(['Personality','Y consonant '+y[0].pers.red.n+' · Y vowel '+y[1].pers.red.n+' · auto '+y[2].pers.red.n,'','NUM_PY_006 / 010']);
+    const v=['ch','py'].map(k=>numVedic(P,mk({vs:k})));if(v[0].nam.red.n!==v[1].nam.red.n)out.push(['Namank','Chaldean '+v[0].nam.red.n,'Pythagorean '+v[1].nam.red.n,'NUM_VE_003'])}
+  const ls=['n','y','vedic'].map(k=>numLoShu(P,mk({ld:k,kua:'n'})));
+  if(ls[0]&&(ls[0].missing.join()!==ls[1].missing.join()||ls[0].missing.join()!==ls[2].missing.join()))out.push(['Lo Shu missing numbers','dates only: '+(ls[0].missing.join(',')||'none'),'with Mulank+Bhagyank: '+(ls[1].missing.join(',')||'none'),'NUM_LS_002 / 005']);
+  return out;
+}
+function numRows(P,o,A){
+  const R=[],on=o.on,has=numNorm(P.full).letters.length>0,py=A.py,ch=A.ch,ve=A.ve,g=A.ls;
+  const add=(calc,stream,val,trail,rule)=>R.push({calc,stream,val:String(val),trail,rule,src:numSrc(rule)});
+  if(on.py){
+    if(py.lp)add('Life Path','Pythagorean',py.lp.red.n,(o.lp==='all'?'all digits ':'components ')+py.lpSum+' → '+py.lp.red.text,o.lp==='all'?'NUM_PY_004':'NUM_PY_003');
+    if(has){add('Expression','Pythagorean',py.exp.red.n,py.exp.total+' → '+py.exp.red.text,'NUM_PY_005');add('Soul Urge','Pythagorean',py.soul.red.n,py.soul.total+' → '+py.soul.red.text,'NUM_PY_005');add('Personality','Pythagorean',py.pers.red.n,py.pers.total+' → '+py.pers.red.text,'NUM_PY_005')}
+    if(py.lp)add('Karmic debt','Pythagorean',(py.karmic||[]).join(', ')||'none','compound seen before reduction','NUM_PY_007');
+  }
+  if(on.ch&&has)add('Name number','Chaldean',ch.name.total+' / '+ch.name.red.n,ch.name.red.text,'NUM_CH_002');
+  if(on.ch&&ch.birth)add('Birth / Destiny','Chaldean',ch.birth.red.n+' / '+ch.dest.red.n,'day '+ch.birth.raw+'; date total '+ch.dest.total+' → '+ch.dest.red.text,'NUM_CH_001');
+  if(on.ve&&ve.mul){add('Mulank','Vedic',ve.mul.n+' ('+numPl(ve.mul.n)+')','birth day → '+ve.mul.text,'NUM_VE_001');add('Bhagyank','Vedic',ve.bha.red.n+' ('+numPl(ve.bha.red.n)+')',ve.bha.total+' → '+ve.bha.red.text,'NUM_VE_001')}
+  if(on.ve&&has)add('Namank','Vedic',ve.nam.red.n+' ('+numPl(ve.nam.red.n)+')',ve.nam.total+' → '+ve.nam.red.text+' ('+ve.nam.sys+')','NUM_VE_003');
+  if(on.ls&&g){add('Lo Shu missing / repeated','Lo Shu',(g.missing.join(',')||'none')+' / '+(g.repeated.join(',')||'none'),'digits '+g.used.join('')+(g.inj.length?' + '+g.inj.map(x=>x[0]+' '+x[1]).join(', '):''),'NUM_LS_002');add('Complete arrows','Lo Shu',g.lines.filter(l=>l.full).map(l=>l.name.replace(/^\w+ /,'')).join(', ')||'none','all three numbers present','NUM_LS_003')}
+  if(on.kb&&A.kb&&A.kb.items.length)add('Hechrechi / Gadol / Katan','Kabbalah',A.kb.hech+' / '+A.kb.gad+' / '+A.kb.kat,'reduced '+A.kb.hechRed.text,'NUM_KB_001');
+  const cy=numCycle(P,o,o.cdate||new Date().toISOString().slice(0,10));
+  if(on.py&&cy)add('Personal Year / Month / Day','Pythagorean',cy.py.n+' / '+cy.pm.n+' / '+cy.pd.n,cy.rm+'+'+cy.rd+'+'+cy.ry+' = '+cy.raw+' → '+cy.py.text,'NUM_PY_009');
+  const st=on.py?numStages(P,o,o.cdate||''):null;
+  if(st&&st.cur)add('Active pinnacle / challenge','Pythagorean',st.cur.pin.n+' / '+st.cur.chal,'cycle '+st.cur.i+' (age '+st.cur.from+'–'+(st.cur.to===null?'end':st.cur.to)+'), current age '+st.age,'NUM_PY_008');
+  return R;
+}
+function numSumText(P,o,A,R){
+  const nm=(o.full||[o.fn,o.mn,o.ln].filter(Boolean).join(' ')).trim()||'(no name entered)',act=Object.keys(o.on).filter(k=>o.on[k]).length,m=o.mth==='custom'?'Custom settings':(NUM_PRESETS[o.mth]||{}).label,F=numFound(P,o,A),rep=Object.keys(F.by).filter(n=>F.by[n].length>=2),sens=numSens(P,o),pend=R.filter(r=>/PENDING/i.test(r.src)).length,sup=R.filter(r=>/Supplied/i.test(r.src)).length;
+  const t=[];
+  t.push('<b>Profile:</b> '+esc(nm)+(P.dob?', born '+esc(P.dob):', no date of birth')+'. <b>Method profile:</b> '+esc(m)+'. '+R.length+' results from '+act+' active stream'+(act===1?'':'s')+'.');
+  t.push(rep.length?'<b>Same number from different calculations:</b> '+rep.map(n=>n+' ('+F.by[n].join(', ')+')').join('; ')+'. These are separate rule sets; agreement is noted, not combined.':'<b>Same number from different calculations:</b> none. The streams use different rules, so differing numbers are expected.');
+  t.push(sens.length?'<b>Method-sensitive:</b> '+sens.map(x=>x[0]).join(', ')+' change under the alternative method choices tested (see the Query “Which method choices change my numbers?”).':'<b>Method-sensitive:</b> none of the tested method choices changes your numbers.');
+  t.push('<b>Source status:</b> every rule is a standard published convention from secondary sources or text supplied by the Product Owner; none is verified against a primary source. '+(sup?sup+' result'+(sup===1?'':'s')+' rest on supplied (unverified) rules. ':'')+(pend?pend+' result'+(pend===1?'':'s')+' still RESEARCH PENDING.':''));
+  t.push('Numerology is a traditional, belief-based framework, not a scientifically established method. Nothing here predicts outcomes.');
+  return t.map(x=>'<p style="margin:0 0 6px;font-size:13px">'+x+'</p>').join('');
+}
+function numSummary(P,o,A){
+  const R=numRows(P,o,A);
+  return `<div class="card" style="border-top:4px solid #c9a227"><h3 style="margin-top:0">Summary</h3>${numSumText(P,o,A,R)}
+   <h4 style="margin:10px 0 4px">Summary table</h4><div style="overflow-x:auto"><table style="font-size:12px"><tr><th>Calculation</th><th>Stream</th><th>Result</th><th>Trail</th><th>Rule</th><th>Source status</th></tr>${R.length?R.map(r=>`<tr><td>${r.calc}</td><td>${r.stream}</td><td><b>${esc(r.val)}</b></td><td class="mute">${esc(r.trail)}</td><td>${r.rule}</td><td>${esc(r.src)}</td></tr>`).join(''):'<tr><td colspan="6" class="mute">Enter a name and date of birth.</td></tr>'}</table></div>
+   <div class="row noprint" style="margin-top:8px"><button class="pri" onclick="window.print()">Print / Save report (PDF)</button><button class="sm" onclick="numExport()">Download JSON</button></div></div>`;
+}
+function numExport(){const s=nms(),P=numPerson(),A=numAll(P,s),R=numRows(P,s,A);dl('appstrosutras-numerology.json',JSON.stringify({engine:'AppstroSutras Numerology multi-stream',generated:new Date().toISOString(),method:s.mth,settings:{yv:s.yv,lp:s.lp,vs:s.vs,py:s.py,lz:s.lz,ly:s.ly,ld:s.ld,kua:s.kua,ftab:s.ftab,cmpm:s.cmpm},results:R,note:'Standard conventions from secondary sources and supplied text; not verified against primary sources. Not a prediction.'},null,2))}
+const NUM_QUERIES=[['lp','What is my Life Path number, and how is it calculated?'],['name','What are my name numbers (Expression, Soul Urge, Personality)?'],['ved','What are my Mulank, Bhagyank and Namank, and their planets?'],['chal','What is my Chaldean compound number and root?'],['miss','Which Lo Shu numbers are missing, repeated or single?'],['arrow','Which Lo Shu arrows are complete or empty?'],['karm','Are there any karmic-debt numbers?'],['cyc','What are my current Personal Year, Month and Day?'],['pin','Which Pinnacle and Challenge is active now?'],['agree','Where do different streams give the same number?'],['sens','Which method choices change my numbers?'],['src','Which results rest on supplied or unverified sources?'],['heb','What are my Hebrew gematria values?'],['pend','What is still RESEARCH PENDING?']];
+function numAnswer(k,P,o,A){
+  const has=numNorm(P.full).letters.length>0,D=numDate(P.dob),need=(c,m)=>c?null:{a:'<span class="mute">'+m+'</span>',rules:[]},py=A.py,ve=A.ve,g=A.ls;
+  const kv=(rows)=>'<table style="font-size:13px">'+rows.map(r=>`<tr><td class="mute" style="width:200px">${r[0]}</td><td>${r[1]}</td></tr>`).join('')+'</table>';
+  switch(k){
+   case 'lp':return need(D,'Enter a valid date of birth.')||{a:kv([['Life Path','<b>'+py.lp.red.n+'</b> ('+(o.lp==='all'?'all-digits method':'component-wise method')+')'],['Component-wise',py.lpC.rm.text+' (month) + '+py.lpC.rd.text+' (day) + '+py.lpC.ry.text+' (year) = '+py.lpC.sum+' → '+py.lpC.red.text],['All digits',py.lpA.sum+' → '+py.lpA.red.text],['Why two answers','Schools differ; the method is chosen in the Methods dropdown.']]),rules:['NUM_PY_002','NUM_PY_003','NUM_PY_004']};
+   case 'name':return need(has,'Enter a name.')||{a:kv([['Expression','<b>'+py.exp.red.n+'</b> – '+py.exp.total+' → '+py.exp.red.text],['Soul Urge (vowels)','<b>'+py.soul.red.n+'</b> – '+py.soul.total+' → '+py.soul.red.text],['Personality (consonants)','<b>'+py.pers.red.n+'</b> – '+py.pers.total+' → '+py.pers.red.text],['Y handling',o.yv==='y'?'vowel':o.yv==='auto'?'vowel only when the name part has no other vowel':'consonant']]),rules:['NUM_PY_001','NUM_PY_005','NUM_PY_006']};
+   case 'ved':return need(D||has,'Enter a name and/or a date of birth.')||{a:kv([['Mulank',ve.mul?'<b>'+ve.mul.n+'</b> – '+numPl(ve.mul.n)+' (birth day '+ve.mul.text+')':'–'],['Bhagyank',ve.bha?'<b>'+ve.bha.red.n+'</b> – '+numPl(ve.bha.red.n)+' ('+ve.bha.total+' → '+ve.bha.red.text+')':'–'],['Namank',has?'<b>'+ve.nam.red.n+'</b> – '+numPl(ve.nam.red.n)+' ('+ve.nam.total+', '+ve.nam.sys+' letters)':'–']]),rules:['NUM_VE_001','NUM_VE_002','NUM_VE_003']};
+   case 'chal':return need(has,'Enter a name.')||{a:kv([['Compound / root','<b>'+A.ch.name.total+' / '+A.ch.name.red.n+'</b> ('+A.ch.name.red.text+')'],['Auspicious list',NUM_AUSP.includes(A.ch.name.total)?'in the supplied list':'not in the supplied list'],['Wording',NUM_INT.comp[A.ch.name.total]?esc(NUM_INT.comp[A.ch.name.total]):'RESEARCH PENDING for this compound']]),rules:['NUM_CH_001','NUM_CH_002','NUM_CH_003','NUM_CH_004']};
+   case 'miss':return need(g,'Enter a valid date of birth.')||{a:kv([['Missing',g.missing.join(', ')||'none'],['Repeated',g.repeated.map(n=>n+' ×'+g.cnt[n]).join(', ')||'none'],['Single',g.single.join(', ')||'none'],['Digits used',g.used.join(' ')+(g.inj.length?' + injected '+g.inj.map(x=>x[0]+' '+x[1]).join(', '):'')]]),rules:['NUM_LS_001','NUM_LS_002','NUM_LS_005']};
+   case 'arrow':return need(g,'Enter a valid date of birth.')||{a:kv([['Complete',g.lines.filter(l=>l.full).map(l=>l.name+' – '+l.plane).join('<br>')||'none'],['Empty',g.lines.filter(l=>l.empty).map(l=>l.name+(l.emptyName?' – '+l.emptyName:'')).join('<br>')||'none'],['Partial',g.lines.filter(l=>!l.full&&!l.empty).map(l=>l.name+' '+l.pct+'%').join(', ')||'none']]),rules:['NUM_LS_003','NUM_LS_004']};
+   case 'karm':return need(D,'Enter a valid date of birth.')||{a:(py.karmic&&py.karmic.length?py.karmic.map(x=>'<b>'+x+'</b>'+(NUM_INT.karmic[+x.split('/')[0]]?' – '+esc(NUM_INT.karmic[+x.split('/')[0]]):'')).join('<br>'):'None found: no compound 13, 14, 16 or 19 appears before reduction in the birth day, Life Path sum or name totals.'),rules:['NUM_PY_007']};
+   case 'cyc':{const cy=numCycle(P,o,o.cdate||new Date().toISOString().slice(0,10));return need(cy,'Enter a valid date of birth.')||{a:kv([['Reference date',cy.C.str],['Personal Year',cy.py.n+' ('+cy.rm+'+'+cy.rd+'+'+cy.ry+' = '+cy.raw+')'+(NUM_INT.transits[cy.py.n]&&numI(o)?' – '+esc(NUM_INT.transits[cy.py.n]):'')],['Personal Month',cy.pm.n],['Personal Day',cy.pd.n],['Year convention',o.py==='bday'?'birthday to birthday':'calendar year']]),rules:['NUM_PY_009','NUM_PY_012']}}
+   case 'pin':{const st=numStages(P,o,o.cdate||'');return need(st,'Enter a valid date of birth.')||{a:kv([['Age on reference date',st.age],['Active cycle',st.cur?st.cur.i+' – '+st.cur.era+' (age '+st.cur.from+'–'+(st.cur.to===null?'end':st.cur.to)+')':'–'],['Pinnacle',st.cur?st.cur.pin.n+(numI(o)?' – '+esc(numArch(st.cur.pin.n)):''):'–'],['Challenge',st.cur?st.cur.chal+(numI(o)&&NUM_INT.chal[st.cur.chal]?' – '+esc(NUM_INT.chal[st.cur.chal]):''):'–']]),rules:['NUM_PY_008']}}
+   case 'agree':{const F=numFound(P,o,A),rep=Object.keys(F.by).filter(n=>F.by[n].length>=2);return {a:rep.length?rep.map(n=>'<b>'+n+'</b>: '+F.by[n].join(', ')).join('<br>'):'No number is repeated across calculations (or too little is entered).',rules:['NUM_CM_001']}}
+   case 'sens':{const s=numSens(P,o);return {a:s.length?'<table style="font-size:13px"><tr><th>Result</th><th>Variant 1</th><th>Variant 2</th><th>Rule</th></tr>'+s.map(x=>`<tr><td>${x[0]}</td><td>${x[1]}</td><td>${x[2]}</td><td>${x[3]}</td></tr>`).join('')+'</table>':'None of the tested method choices (Life Path variant, Y handling, Namank letters, Lo Shu injection) changes your numbers.',rules:['NUM_PY_003','NUM_PY_006','NUM_VE_003','NUM_LS_005']}}
+   case 'src':{const R=numRows(P,o,A);return {a:'<table style="font-size:13px"><tr><th>Result</th><th>Rule</th><th>Status</th></tr>'+R.map(r=>`<tr><td>${r.calc} (${r.stream})</td><td>${r.rule}</td><td>${esc(r.src)}</td></tr>`).join('')+'</table><p class="mute" style="margin:6px 0 0">No rule has been verified against a primary source.</p>',rules:[]}}
+   case 'heb':return need(A.kb&&A.kb.items.length,'Enter Hebrew letters in the Kabbalah tab.')||{a:kv([['Mispar Hechrechi','<b>'+A.kb.hech+'</b> → '+A.kb.hechRed.text],['Mispar Gadol','<b>'+A.kb.gad+'</b> → '+A.kb.gadRed.text],['Mispar Katan','<b>'+A.kb.kat+'</b> → '+A.kb.katRed.text]]),rules:['NUM_KB_001','NUM_KB_002','NUM_KB_003']};
+   case 'pend':return {a:'<ul style="margin:0 0 0 18px">'+NUM_RULES.filter(r=>numRuleClass(r)==='Pending').map(r=>`<li><b>${r.id}</b> – ${esc(r.rule)}</li>`).join('')+'</ul>',rules:[]};
+  }
+  return {a:'',rules:[]};
+}
+function numTabQuery(P,o,A){
+  const k=o.qry||'lp',r=numAnswer(k,P,o,A),q=NUM_QUERIES.find(x=>x[0]===k);
+  return `<div class="card"><div class="row"><b>Query</b><select style="max-width:100%" onchange="numSet('qry',this.value)">${opt(NUM_QUERIES.map(x=>[x[0],x[1]]),k)}</select></div></div>
+   <div class="card"><h3 style="margin-top:0">${esc(q?q[1]:'')}</h3>${r.a}${r.rules.length?`<p class="mute" style="margin:8px 0 0">Rules used: ${r.rules.map(x=>x+' ('+esc(numSrc(x))+')').join(' · ')}</p>`:''}</div>`;
+}
+const NUM_REFS=[['all','All rules'],['Pythagorean','Pythagorean rules'],['Chaldean','Chaldean rules'],['Vedic','Vedic (Anka Jyotish) rules'],['Lo Shu','Lo Shu rules'],['Kabbalah','Kabbalah / gematria rules'],['Input','Input and normalisation rules'],['Compatibility','Compatibility rules'],['Names','Name and spelling rules'],['Interpretation','Interpretation layer'],['@Supplied','Supplied by the Product Owner (unverified)'],['@Pending','RESEARCH PENDING items'],['@Variant','Disputed / variant / derived rules'],['@Standard','Standard conventions (secondary sources)']];
+function numTabRules(P,o){
+  const cmp=[['Alphabet','A–Z = 1–9 repeating','1–8 (9 unassigned)','Pythagorean or Chaldean (selectable)','Digits of the birth date (no alphabet)','Hebrew letter values'],['Reduction','Digital root, keep 11/22/33','Compound kept + root; no masters','Digital root; 1–9','Digit counts (no reduction)','Total and reduction per Mispar'],['Compound numbers','Used for karmic debt 13/14/16/19','Central (10–52); 18 meanings supplied','Namank compound shown','–','Gematria total'],['Date numbers','Life Path, Birthday','Birth, Destiny','Mulank, Bhagyank','Digits of DDMMYYYY (+ optional injection)','–'],['Planets','–','–','1 Sun … 9 Mars (spec mapping)','–','–']];
+  const dis=[['Y as vowel','Pythagorean','Consonant (default), vowel, or vowel only when the name part has no other vowel'],['Life Path method','Pythagorean','Component-wise (default) or all digits'],['Pinnacle ages / master handling','Pythagorean','First pinnacle at 36 − Life Path (default); masters in sums kept'],['Personal year convention','Pythagorean / Vedic','Calendar year or birthday to birthday'],['Namank mapping','Vedic','Chaldean (default) or Pythagorean'],['Number friendships','Vedic','Derived from planetary friendship (4 and 7 pending) or the supplied table (asymmetric)'],['Lo Shu injection / Kua','Lo Shu','None, Mulank + Bhagyank, Vedic rule, optional Kua'],['Lo Shu labels','Lo Shu','Supplied labels or digits only'],['Hebrew transliteration','Kabbalah','No scheme adopted – Hebrew letters only'],['Compatibility','All','Qualitative (default) or supplied weighted index']];
+  const ref=o.ref||'all',sel=NUM_RULES.filter(r=>ref==='all'||(ref[0]==='@'?numRuleClass(r)===ref.slice(1):r.stream===ref));
+  const cnt={};NUM_RULES.forEach(r=>{const c=cnt[r.stream]=cnt[r.stream]||{n:0,Standard:0,Variant:0,Supplied:0,Pending:0};c.n++;c[numRuleClass(r)]++});
+  const tiers=[['A','Classical / primary text','None used – no primary text has been verified'],['B','Practitioner / traditional-school convention','Standard conventions listed as “Standard”, “Variant” or “Derived”'],['C','Modern published guidance','Same secondary web sources as B; not individually cited'],['D','Commercial / supplied wording','Supplied by the Product Owner (“Supplied”)'],['E','Unverified or not available','RESEARCH PENDING']];
+  return `<div class="card"><div class="row"><b>Reference</b><select style="max-width:100%" onchange="numSet('ref',this.value)">${opt(NUM_REFS.map(x=>[x[0],x[1]+(x[0]==='all'?' ('+NUM_RULES.length+')':'')]),ref)}</select><span class="mute">${sel.length} rule${sel.length===1?'':'s'} shown</span></div></div>
+   <div class="card"><h3 style="margin-top:0">Rule register</h3><div style="overflow-x:auto"><table style="font-size:12px"><tr><th>ID</th><th>Stream</th><th>Rule</th><th>Type</th><th>Source status</th><th>Status</th></tr>${sel.map(r=>`<tr><td>${r.id}</td><td>${r.stream}</td><td>${esc(r.rule)}</td><td>${r.kind}</td><td>${esc(r.source)}</td><td>${esc(r.status)}</td></tr>`).join('')}</table></div>
+   <p class="mute" style="margin-bottom:0">No classical citation, author, edition or page is claimed for any rule. Where reliable sources disagree, both variants are kept selectable. Approval status of every rule: PENDING – Product Owner approval required.</p></div>
+   <div class="card"><h3 style="margin-top:0">Rules by stream and source class</h3><table style="font-size:13px"><tr><th>Stream</th><th>Rules</th><th>Standard</th><th>Variant / derived</th><th>Supplied</th><th>Pending</th></tr>${Object.keys(cnt).map(k=>`<tr><td>${k}</td><td>${cnt[k].n}</td><td>${cnt[k].Standard}</td><td>${cnt[k].Variant}</td><td>${cnt[k].Supplied}</td><td>${cnt[k].Pending}</td></tr>`).join('')}</table>
+   <h4 style="margin:10px 0 4px">Source-quality tiers</h4><table style="font-size:13px"><tr><th>Tier</th><th>Meaning</th><th>Used here</th></tr>${tiers.map(t=>`<tr><td>${t[0]}</td><td>${t[1]}</td><td>${t[2]}</td></tr>`).join('')}</table></div>
+   <div class="card"><h3 style="margin-top:0">Methodology comparison</h3><div style="overflow-x:auto"><table style="font-size:13px"><tr><th></th><th>Pythagorean</th><th>Chaldean</th><th>Vedic</th><th>Lo Shu</th><th>Kabbalah</th></tr>${cmp.map(r=>`<tr><td><b>${r[0]}</b></td>${r.slice(1).map(x=>`<td>${x}</td>`).join('')}</tr>`).join('')}</table></div></div>
+   <div class="card"><h3 style="margin-top:0">Disputed-rule register</h3><table style="font-size:13px"><tr><th>Rule</th><th>Stream</th><th>Variants</th></tr>${dis.map(r=>`<tr><td>${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td></tr>`).join('')}</table></div>`;
+}
+/* ---- page ---- */
+const NUM_TABS=[['Overview',[['da','Dashboard'],['qu','Query']]],['Streams',[['py','Pythagorean'],['ch','Chaldean'],['ve','Vedic'],['ls','Lo Shu'],['kb','Kabbalah']]],['Analysis',[['na','Names'],['cy','Cycles'],['co','Compatibility'],['bz','Business']]],['Reference',[['ru','Rulebook'],['au','Audit']]]];
+const NUM_FLOW=[['1 Input','name, date, script'],['2 Normalise','letters only, accents folded'],['3 Map','stream alphabet or digits'],['4 Sum','total with trail'],['5 Reduce','root; compound kept'],['6 Result','per stream, never merged'],['7 Synthesis','reads results only'],['8 Summary','text + table + report']];
+function vNum(){
+  const s=nms(),P=numPerson(),o=s,A=numAll(P,o),tab=V.nt||'da',pr=NUM_PRESETS[s.mth];
+  const head=`<div class="card" style="border-top:4px solid #c9a227"><h2 style="margin:0 0 2px">ASTROSUTRAS – NUMEROLOGY MULTI-STREAM ENGINE</h2><div class="mute">Pythagorean · Chaldean · Vedic · Lo Shu · Kabbalah – five independent rule sets, never merged</div>
+   <div class="row noprint" style="gap:4px;margin-top:8px">${NUM_FLOW.map((f,i)=>`<span class="tag" title="${f[1]}">${f[0]}</span>${i<NUM_FLOW.length-1?'<span class="mute">›</span>':''}`).join('')}</div>
+   <details class="noprint" style="margin-top:6px"><summary class="mute" style="font-size:13px">How the information is organised, and why</summary><ol style="margin:6px 0 0 18px;font-size:13px">
+    <li><b>Inputs first.</b> Every stream reads the same normalised name and date, so a change is made once and seen everywhere.</li>
+    <li><b>Methods before results.</b> The Methods dropdown fixes the disputed choices (Life Path variant, Y, Namank letters, Lo Shu injection, friendship table) before anything is calculated, so a number can always be traced to the rule that produced it.</li>
+    <li><b>One tab per stream.</b> Alphabets, reductions and labels of different traditions are not mixed; each tab shows its own calculation steps.</li>
+    <li><b>Analysis tabs reuse the streams.</b> Names, Cycles, Compatibility and Business only call the stream engines; they add no new rules of their own except those listed in the Rulebook.</li>
+    <li><b>Reference and Query trace everything.</b> The Reference dropdown filters the rule register by stream or source class; the Query dropdown answers a question with its calculation and the rule IDs used.</li>
+    <li><b>Interpretation is separate.</b> Wording is a switchable layer (Show wording); turning it off leaves the calculations unchanged.</li>
+    <li><b>Summary last.</b> Every tab ends with a plain-language summary and a table with the rule and source status of each result.</li></ol></details></div>`;
+  const chartOpts=[['','— load name and date from a saved horoscope —']].concat(S.charts.map(c=>[c.id,c.name]));
+  const nav=`<div class="card noprint"><div class="row" style="gap:10px 14px;align-items:flex-end"><label style="margin:0"><b>Methods</b><br><select style="min-width:230px" onchange="numPreset(this.value)">${opt([['custom','Custom (current settings)']].concat(Object.keys(NUM_PRESETS).map(k=>[k,NUM_PRESETS[k].label])),s.mth)}</select></label>
+    <label style="margin:0"><b>Reference</b><br><select style="min-width:230px" onchange="numNav('ref',this.value,'ru')">${opt(NUM_REFS.map(x=>[x[0],x[1]]),s.ref)}</select></label>
+    <label style="margin:0"><b>Query</b><br><select style="min-width:260px;max-width:100%" onchange="numNav('qry',this.value,'qu')">${opt(NUM_QUERIES.map(x=>[x[0],x[1]]),s.qry)}</select></label></div>
+    <p class="mute" style="margin:6px 0 0;font-size:12px">${pr?esc(pr.d):'Custom: the individual settings below are in use. Choosing a method profile sets them all at once.'}</p></div>`;
+  const inp=`<div class="card noprint"><div class="row"><b>Personal profile</b><select onchange="numUseChart(this.value,'A')">${opt(chartOpts,s.chartA||'')}</select><button class="sm" onclick="numReset()">Reset</button></div>
+   <div class="row" style="margin-top:8px;gap:8px 12px"><label style="margin:0">First name<br><input value="${esc(s.fn)}" style="width:150px" onchange="numSet('fn',this.value)"></label><label style="margin:0">Middle name<br><input value="${esc(s.mn)}" style="width:150px" onchange="numSet('mn',this.value)"></label><label style="margin:0">Last name<br><input value="${esc(s.ln)}" style="width:150px" onchange="numSet('ln',this.value)"></label><label style="margin:0">Full name at birth (optional – built from the parts)<br><input value="${esc(s.full)}" style="width:260px" onchange="numSet('full',this.value)"></label><label style="margin:0">Date of birth<br><input type="date" value="${esc(s.dob)}" onchange="numSet('dob',this.value)"></label><label style="margin:0">Sex (Kua only)<br><select onchange="numSet('g',this.value)">${opt([['m','Male'],['f','Female']],s.g)}</select></label></div>
+   <details style="margin-top:8px"><summary><b>Individual method settings</b></summary><div class="row" style="margin-top:8px;gap:8px 12px"><label style="margin:0">Y in Pythagorean vowels<br><select onchange="numSet('yv',this.value)">${opt([['n','Y is a consonant'],['y','Y is a vowel'],['auto','Vowel only if no other vowel']],s.yv)}</select></label><label style="margin:0">Pythagorean Life Path<br><select onchange="numSet('lp',this.value)">${opt([['comp','Component-wise'],['all','All digits']],s.lp)}</select></label><label style="margin:0">Vedic Namank letters<br><select onchange="numSet('vs',this.value)">${opt([['ch','Chaldean'],['py','Pythagorean']],s.vs)}</select></label><label style="margin:0">Number friendship table<br><select onchange="numSet('ftab',this.value)">${opt([['der','Derived from planetary friendship'],['sup','Supplied table (unverified)']],s.ftab)}</select></label>
+    <label style="margin:0">Lo Shu zero<br><select onchange="numSet('lz',this.value)">${opt([['n','Excluded'],['y','Kept (no cell)']],s.lz)}</select></label><label style="margin:0">Lo Shu year<br><select onchange="numSet('ly',this.value)">${opt([['full','Full year'],['two','Last two digits']],s.ly)}</select></label><label style="margin:0">Derived numbers in Lo Shu<br><select onchange="numSet('ld',this.value)">${opt([['n','Not added'],['y','Add Mulank and Bhagyank'],['vedic','Vedic rule (Mulank only if two-digit day, not 10/20/30)']],s.ld)}</select></label><label style="margin:0">Kua in Lo Shu<br><select onchange="numSet('kua',this.value)">${opt([['n','Not added'],['y','Add Kua (Feng Shui number)']],s.kua)}</select></label><label style="margin:0">Lo Shu labels<br><select onchange="numSet('ll',this.value)">${opt([['digits','Digits only'],['common','Supplied labels']],s.ll)}</select></label><label style="margin:0">Wording<br><select onchange="numSet('int',this.value)">${opt([['y','Show interpretation wording'],['n','Calculations only']],s.int)}</select></label></div></details>
+   <div class="row" style="margin-top:8px;gap:12px"><span class="mute">Streams:</span>${[['py','Pythagorean'],['ch','Chaldean'],['ve','Vedic'],['ls','Lo Shu'],['kb','Kabbalah']].map(([k,l])=>`<label style="display:inline-flex;gap:4px;align-items:center;margin:0;font-size:13px;color:var(--ink)"><input type="checkbox" ${s.on[k]?'checked':''} onchange="numSetOn('${k}',this.checked)" style="width:auto">${l}</label>`).join('')}</div></div>`;
+  const tabs=`<div class="card noprint" style="padding:8px 14px">${NUM_TABS.map(([g,l])=>`<div class="row" style="margin:2px 0"><span class="mute" style="width:72px;font-size:12px">${g}</span>${l.map(([k,n])=>`<button class="${tab===k?'on':''}" onclick="V.nt='${k}';render()">${n}</button>`).join('')}</div>`).join('')}</div>`;
+  const dis=k=>!s.on[k]?'<div class="card mute">This stream is switched off in the inputs.</div>':null;
+  const w=numWarn(P);
+  const body={da:()=>numTabDash(P,o,A),qu:()=>numTabQuery(P,o,A),py:()=>dis('py')||numTabPy(P,o,A),ch:()=>dis('ch')||numTabCh(P,o,A),ve:()=>dis('ve')||numTabVe(P,o,A),ls:()=>dis('ls')||numTabLs(P,o,A),kb:()=>dis('kb')||numTabKb(P,o,A),na:()=>numTabNames(P,o,A),cy:()=>numTabCycles(P,o,A),co:()=>numTabCompat(P,o,A),bz:()=>numTabBiz(P,o,A),ru:()=>numTabRules(P,o),au:()=>numTabAudit()}[tab]();
+  return head+nav+inp+tabs+(tab!=='da'&&tab!=='ru'&&tab!=='au'&&w.length?`<div class="card" style="border-left:4px solid var(--warn)"><ul style="margin:0 0 0 18px">${w.map(x=>`<li>${esc(x)}</li>`).join('')}</ul></div>`:'')+body+(tab==='ru'||tab==='au'?'':numSummary(P,o,A));
+}
+/* ---- additional audit cases and self-test ---- */
+NUM_GOLD.push(
+ ['Y as vowel only when no other vowel (LYNN)','LYNN',()=>{const v=numVC('Lynn','auto');return {steps:'LYNN has no A/E/I/O/U → Y is a vowel; vowels '+v.v.join('')+', consonants '+v.c.join(''),ok:v.v.join('')==='Y'&&v.c.join('')==='LNN',val:'vowel Y'}}],
+ ['Y stays a consonant when another vowel exists (MAYA)','MAYA',()=>{const v=numVC('Maya','auto');return {steps:'vowels '+v.v.join(''),ok:v.v.join('')==='AA',val:'consonant Y'}}],
+ ['Kua male 1985','1985',()=>{const k=numKua(1985,'m');return {steps:'1+9+8+5 = 23 → 5; 11 − 5 = 6',ok:k===6,val:'6'}}],
+ ['Kua female 1985','1985',()=>{const k=numKua(1985,'f');return {steps:'digit root 5; 4 + 5 = 9',ok:k===9,val:'9'}}],
+ ['Kua 5 adjusts (male 1986 → 2, female 1990 → 8)','1986 / 1990',()=>({steps:'male 1986: root 6, 11 − 6 = 5 → 2; female 1990: root 1, 4 + 1 = 5 → 8',ok:numKua(1986,'m')===2&&numKua(1990,'f')===8,val:'2 and 8'})],
+ ['Kua equals the standard formula, 1900–2099','1900–2099',()=>{let ok=true;for(let y=1900;y<=2099;y++)for(const g of ['m','f']){const s=numRed(+String(y).slice(-2),[]).n;let std=y<2000?(g==='m'?10-s:5+s):(g==='m'?9-s:6+s);std=std<=0?std+9:std>9?numRed(std,[]).n:std;if(std===5)std=g==='m'?2:8;if(std!==numKua(y,g))ok=false}return {steps:'compared 400 cases with 10−s / 5+s (1900s) and 9−s / 6+s (2000s)',ok,val:ok?'all equal':'differs'}}],
+ ['Vedic injection example 1985-04-06 (male)','1985-04-06',()=>{const g=numLoShu({dob:'1985-04-06'},{lz:'n',ly:'full',ld:'vedic',kua:'y',g:'m'});return {steps:'digits 1 9 8 5 4 6; day 6 is one digit so Mulank is not added; Bhagyank 6 and Kua 6 added → 6 appears 3 times; 4-5-6 complete',ok:g.cnt[6]===3&&g.lines.find(l=>l.name==='Diagonal 4-5-6').full&&g.inj.length===2,val:'6 ×3, Golden Yog'}}],
+ ['Vedic injection adds Mulank for a two-digit day','1990-12-25',()=>{const g=numLoShu({dob:'1990-12-25'},{lz:'n',ly:'full',ld:'vedic',kua:'n',g:'m'});return {steps:'day 25 → Mulank 7 added; Bhagyank 11→2 … 2+5+1+2+1+9+9+0 = 29 → 2 added',ok:g.inj.map(x=>x.join(':')).join()==='Mulank:7,Bhagyank:2',val:'Mulank 7, Bhagyank 2'}}],
+ ['Personal Year 1990-08-15 in 2026','1990-08-15',()=>{const c=numCycle({dob:'1990-08-15'},{py:'cal'},'2026-11-14');return {steps:'8 + 6 + 1 = 15 → 6; month 6 + 11 = 17 → 8; day 8 + 14 = 22 → 4; universal 1 / 3 / 8',ok:c.py.n===6&&c.pm.n===8&&c.uy.n===1&&c.um.n===3&&c.ud.n===8,val:'6 / 8 / 4'}}],
+ ['Nine-year Personal Years from 2026 for 1990-08-15','1990-08-15',()=>{const c=numCycle({dob:'1990-08-15'},{py:'cal'},'2026-11-14');return {steps:'2026 → 6, 2027 → 7, 2028 → 8 …',ok:c.nine.slice(0,3).map(x=>x.n).join()==='6,7,8'&&c.nine.length===9,val:'6, 7, 8 …'}}],
+ ['Pinnacles / challenges and active stage, 1990-08-15 on 2026-11-14','1990-08-15',()=>{const st=numStages({dob:'1990-08-15'},{lp:'comp'},'2026-11-14');return {steps:'pinnacles 5,7,3,9; challenges 2,5,3,7; first cycle ends at 30; age 36 → cycle 2 (31–39)',ok:st.list.map(x=>x.pin.n).join()==='5,7,3,9'&&st.list.map(x=>x.chal).join()==='2,5,3,7'&&st.cur.i===2&&st.age===36&&st.list[0].to===30,val:'cycle 2, pinnacle 7, challenge 5'}}],
+ ['Supplied pair scores (Pythagorean)','1/3, 1/2, 1/4',()=>({steps:'natural 95; neutral 72; friction 45',ok:numHarm(1,3).score===95&&numHarm(1,2).score===72&&numHarm(1,4).score===45,val:'95 / 72 / 45'})],
+ ['Supplied Vedic scores','1/2, 1/4, 1/6, 9/7',()=>({steps:'friend 95; neutral 70; enemy 40; 9→7 is not covered → 40',ok:numVedSc(1,2).score===95&&numVedSc(1,4).score===70&&numVedSc(1,6).score===40&&numVedSc(9,7).score===40,val:'95 / 70 / 40 / 40'})],
+ ['Supplied tier cut-offs','85, 72, 60, 59.9',()=>({steps:'≥85 soulmate; ≥72 dynamic growth; ≥60 karmic catalyst; else friction',ok:numTier(85)==='soulmate_harmonic'&&numTier(72)==='dynamic_growth'&&numTier(60)==='karmic_catalyst'&&numTier(59.9)==='challenging_friction',val:'4 tiers'})],
+ ['Supplied friendship table gaps and asymmetry','table',()=>({steps:'5→5 and 9→7 not covered; some pairs differ by direction',ok:!NUM_FR_SUP[5][0].concat(NUM_FR_SUP[5][1],NUM_FR_SUP[5][2]).includes(5)&&!NUM_FR_SUP[9][0].concat(NUM_FR_SUP[9][1],NUM_FR_SUP[9][2]).includes(7)&&numFrAsym().length>0,val:numFrAsym().length+' asymmetric pairs'})],
+ ['Spelling explorer: Nova Tech (Chaldean)','Nova Tech',()=>{const r=numOptimize('Nova Tech','chaldean',[],[],50);return {steps:'N5+O7+V6+A1 = 19; T4+E5+C3+H5 = 17; total 36; adding A gives 37 (auspicious list)',ok:r.cur.total===36&&r.list.some(x=>x.total===37),val:'36 → includes 37'}}]
+);
+function numSelfTest(){
+  const res=[],t=(n,ok)=>res.push({n,ok:!!ok});
+  t('Pythagorean mapping: A=1, I=9, J=1, R=9, S=1, Z=8',NUM_PY.A===1&&NUM_PY.I===9&&NUM_PY.J===1&&NUM_PY.R===9&&NUM_PY.S===1&&NUM_PY.Z===8);
+  t('Chaldean mapping: 26 letters, values 1–8, no 9',Object.keys(NUM_CH).length===26&&Object.values(NUM_CH).every(v=>v>=1&&v<=8));
+  t('Chaldean groups: 1 AIJQY, 2 BKR, 3 CGLS, 4 DMT, 5 EHNX, 6 UVW, 7 OZ, 8 FP',[[1,'AIJQY'],[2,'BKR'],[3,'CGLS'],[4,'DMT'],[5,'EHNX'],[6,'UVW'],[7,'OZ'],[8,'FP']].every(([n,s])=>[...s].every(c=>NUM_CH[c]===n)));
+  t('Hebrew: 27 letter forms; finals Gadol 500–900',Object.keys(NUM_HE).length===27&&NUM_HE['ך'][2]===500&&NUM_HE['ץ'][2]===900);
+  t('Rule register ids are unique',new Set(NUM_RULES.map(r=>r.id)).size===NUM_RULES.length);
+  t('Every method preset only sets known keys',Object.values(NUM_PRESETS).every(p=>Object.keys(p.set).every(k=>NUM_MK.includes(k))));
+  t('Every query returns an answer',(()=>{const P={fn:'Anoopam',mn:'',ln:'Shukla',full:'Anoopam Shukla',dob:'1990-12-25'},o=Object.assign({},NUM_DEF,{he:'שלום'}),A=numAll(P,o);return NUM_QUERIES.every(q=>{try{return String(numAnswer(q[0],P,o,A).a).length>0}catch(e){return false}})})());
+  NUM_GOLD.forEach(([n,i,fn])=>{let r;try{r=fn()}catch(e){r={ok:false}}t('Golden case: '+n,r.ok)});
+  const ok=res.filter(x=>x.ok).length;return {pass:ok,total:res.length,fail:res.filter(x=>!x.ok).map(x=>x.n)};
+}
+
 /* ============ KP – KRISHNAMURTI PADDHATI ============ */
 addTr([['KP','केपी','કેપી'],['Planets & Cusps','ग्रह और भाव-संधि','ગ્રહ અને ભાવ-સંધિ'],['Significators','कारक (सिग्निफिकेटर)','કારક (સિગ્નિફિકેટર)'],['Ruling Planets','शासक ग्रह (RP)','શાસક ગ્રહ (RP)'],['Event Analysis','घटना विश्लेषण','ઘટના વિશ્લેષણ'],['KP Chart','केपी कुंडली','કેપી કુંડળી'],['Star lord','नक्षत्र स्वामी','નક્ષત્ર સ્વામી'],['Sub lord','उप स्वामी (Sub)','ઉપ સ્વામી (Sub)'],['Sub-sub lord','उप-उप स्वामी','ઉપ-ઉપ સ્વામી'],['Cusp','भाव-संधि','ભાવ-સંધિ'],['Apply KP settings','केपी सेटिंग लागू करें','કેપી સેટિંગ લાગુ કરો'],['Day lord','वार स्वामी','વાર સ્વામી']]);
 function kpLords(lon){
@@ -4422,9 +4997,9 @@ function vSens(){
   <div class="card"><div style="overflow-x:auto"><table><tr><th>Shift</th><th>Time</th><th>Lagna</th><th>D9 Lagna</th><th>D10 Lagna</th><th>Moon</th><th>Dasha at birth</th></tr>${rows.join('')}</table></div></div>`;
 }
 function vLab(){
-  const sub=V.lb||'work',subs=[['work','Workspace'],['panch','Panchanga'],['sens','Birth-time Sensitivity'],['milan','Ashtakoot Milan'],['sbc','Sarvatobhadra Chakra'],['dkoot','Dashakoot']];
+  const sub=V.lb||'work',subs=[['work','Workspace'],['panch','Panchanga'],['sens','Birth-time Sensitivity'],['milan','Ashtakoot Milan'],['sbc','Sarvatobhadra Chakra'],['dkoot','Dashakoot'],['num','Numerology']];
   const bar=`<div class="card" style="padding:8px 14px"><div class="row"><b style="color:var(--acc)">Astro Lab</b><span class="mute">›</span>${subs.map(([k,l])=>`<button class="${sub===k?'on':''}" onclick="V.lb='${k}';render()">${l}</button>`).join('')}</div></div>`;
-  return bar+(sub==='work'?vWork():sub==='panch'?vPanch():sub==='milan'?vMilan():sub==='sbc'?vSBC():sub==='dkoot'?vDash():vSens());
+  return bar+(sub==='work'?vWork():sub==='panch'?vPanch():sub==='milan'?vMilan():sub==='sbc'?vSBC():sub==='dkoot'?vDash():sub==='num'?vNum():vSens());
 }
 /* ============ RESEARCH menu ============ */
 function vEvents(){
