@@ -112,8 +112,24 @@ footer.disc{max-width:1200px;margin:6px auto 18px;width:calc(100% - 24px)}
 .lcard{width:100%;max-width:420px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:22px;margin:auto}
 .lbrand{font-size:30px;font-weight:700;color:var(--acc)}
 body.locked header,body.locked main,body.locked footer.disc{display:none}
+.sbc{display:grid;grid-template-columns:repeat(9,var(--sz));gap:2px;justify-content:center;font-size:calc(var(--sz)*.22)}
+.sbc-c{width:var(--sz);height:var(--sz);min-height:0;padding:1px;border:1px solid var(--line);border-radius:3px;background:var(--bg);color:var(--ink);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;cursor:pointer;line-height:1.1;font-size:inherit}
+.sbc-c .n{font-size:.78em;color:var(--mute)}
+.sbc-c.k-nak{background:var(--acc2)}
+.sbc-c.k-weekday{background:var(--card)}
+.sbc-c.pth{background:rgba(179,38,30,.14)}
+.sbc-c.dri{background:rgba(46,139,87,.42)}
+.sbc-c.ved{background:rgba(179,38,30,.42)}
+.sbc-c.both{background:rgba(120,60,180,.48)}
+.sbc-c.sel{box-shadow:inset 0 0 0 3px #2a6fdb}
+.sbc-c .ch{display:flex;flex-wrap:wrap;justify-content:center}
+.pc{font-style:normal;font-size:.72em;font-weight:800;padding:0 2px;border-radius:3px;margin:0 1px}
+.pc.nat{background:#d4a017;color:#2a1c00}.pc.trn{background:#e8721c;color:#fff}
+.lg{display:inline-block;width:14px;height:14px;border:1px solid var(--line);border-radius:3px;vertical-align:middle;margin-right:2px}
+.lg.sel{box-shadow:inset 0 0 0 3px #2a6fdb}.lg.dri{background:rgba(46,139,87,.55)}.lg.ved{background:rgba(179,38,30,.55)}.lg.both{background:rgba(120,60,180,.6)}.lg.pth{background:rgba(179,38,30,.18)}
 </style>
 </head>
+
 <body>
 <header>
   <div translate="no" style="margin-right:12px;line-height:1.15"><h1 style="margin:0">AppstroSutras</h1><div class="mute" style="font-size:11px">AppstroSutras by Anoopam Shukla</div></div>
@@ -3019,6 +3035,310 @@ function mlRe(M){
    ${mlSu(M)}${mlDo(M)}${ch}${pl}${mlDa(M)}`;
 }
 
+/* ============ SARVATOBHADRA CHAKRA (Astro Lab › Sarvatobhadra Chakra) ============
+   Verified structure (consistent across the secondary sources consulted): 9×9 grid; outer ring of 32 cells = 28 nakshatras
+   (7 per side, Abhijit between Uttara Ashadha and Shravana) + 4 corner cells; counting clockwise; Krittika is the first
+   nakshatra on the east side; Ashwini is the 6th nakshatra of the upper row. Inner rings by position: diagonals hold the 16
+   swaras, 20 consonants, 12 rashis, 5 centre cells for weekdays / tithi groups. Exact letters, rashi order and tithi groups
+   in the inner cells are NOT verified from a primary text → left as RESEARCH PENDING (user may import verified contents).
+   Vedha is implemented only at nakshatra level (three lines through the grid). SBC-specific Drishti: RESEARCH PENDING. */
+addTr([['Sarvatobhadra Chakra','सर्वतोभद्र चक्र','સર્વતોભદ્ર ચક્ર']]);
+const SBC_VER='1.0',SBC_PEND='RESEARCH PENDING';
+const SBC_SHORT=['Ashw','Bhar','Krit','Rohi','Mrig','Ardr','Puna','Push','Asle','Magh','PPha','UPha','Hast','Chit','Swat','Vish','Anur','Jyes','Mool','PAsh','UAsh','Shra','Dhan','Shat','PBha','UBha','Reva'];
+const SBC_ORDER=[22,23,24,25,26,0,1,'C',2,3,4,5,6,7,8,'C',9,10,11,12,13,14,15,'C',16,17,18,19,20,'ABH',21,'C'];
+const SBC_CORNER=['TR – between Bharani and Krittika (26°40′ Aries)','BR – between Ashlesha and Magha (0° Leo)','BL – between Vishakha and Anuradha (3°20′ Scorpio)','TL – between Shravana and Dhanishta (23°20′ Capricorn)'];
+const SBC_WD={'4,5':'Friday · Venus','5,4':'Thursday · Jupiter','5,5':'Saturday · Saturn','5,6':'Sunday / Tuesday · Sun, Mars','6,5':'Monday / Wednesday · Moon, Mercury'};
+const SBC_PLC={Sun:'grief',Mars:'loss of wealth',Saturn:'pain and ailments',Rahu:'obstructions',Ketu:'obstructions',Moon:'mixed good and bad events',Venus:'fear from enemies',Mercury:'sharpening of intellect',Jupiter:'many gains'};
+const SBC_BEN=['Jupiter','Venus','Mercury'];
+const sbcName=n=>n==='ABH'?'Abhijit':NAKS[n],sbcShort=n=>n==='ABH'?'Abhi':SBC_SHORT[n];
+function sbcPerimeter(){const p=[];for(let c=2;c<=8;c++)p.push([1,c]);p.push([1,9]);for(let r=2;r<=8;r++)p.push([r,9]);p.push([9,9]);for(let c=8;c>=2;c--)p.push([9,c]);p.push([9,1]);for(let r=8;r>=2;r--)p.push([r,1]);p.push([1,1]);return p}
+const SBC_CELLS=(()=>{
+  const m={},per=sbcPerimeter();let cn=0;
+  for(let r=1;r<=9;r++)for(let c=1;c<=9;c++){
+    const ring=Math.min(r,c,10-r,10-c),diag=(r===c||r+c===10);
+    let kind=ring===1?'nak':ring===5?'center':diag?'swara':ring===2?'akshara':ring===3?'rashi':'weekday';
+    if(ring===4&&!diag)kind='weekday';
+    m[r+','+c]={id:'R'+r+'C'+c,r,c,ring,kind,nak:null,corner:null,wd:SBC_WD[r+','+c]||null};
+  }
+  per.forEach(([r,c],i)=>{const v=SBC_ORDER[i],x=m[r+','+c];if(v==='C'){x.kind='corner';x.corner=SBC_CORNER[cn++]}else x.nak=v});
+  m['5,5'].kind='weekday';
+  return m;
+})();
+const SBC_NAKCELL=(()=>{const o={};Object.values(SBC_CELLS).forEach(x=>{if(x.nak!==null)o[x.nak]=x});return o})();
+const sbcCell=(r,c)=>SBC_CELLS[r+','+c];
+const SBC_EDGE=r=>r;
+/* line geometry (Saravali: forward = diagonal in the clockwise sense, opposite = straight across, backward = diagonal in the anticlockwise sense) */
+function sbcEdge(x){return x.r===1?'top':x.c===9?'right':x.r===9?'bottom':'left'}
+const SBC_DIR={top:{inw:[1,0],fwd:[1,1],bwd:[1,-1]},right:{inw:[0,-1],fwd:[1,-1],bwd:[-1,-1]},bottom:{inw:[-1,0],fwd:[-1,-1],bwd:[-1,1]},left:{inw:[0,1],fwd:[-1,1],bwd:[1,1]}};
+function sbcWalk(x,d){const path=[];let r=x.r+d[0],c=x.c+d[1];while(r>=1&&r<=9&&c>=1&&c<=9){path.push(sbcCell(r,c));r+=d[0];c+=d[1]}return path}
+function sbcLine(x,line){const D=SBC_DIR[sbcEdge(x)],d=line==='opposite'?D.inw:line==='forward'?D.fwd:D.bwd,p=sbcWalk(x,d);return {line,path:p.slice(0,-1),target:p[p.length-1]}}
+/* Abhijit (documented alternative treatments): excluded → 27 nakshatras; included → 276°40′–280°53′20″ */
+function sbcNakOf(lon,abh){lon=((lon%360)+360)%360;if(abh==='in'&&lon>=276+40/60&&lon<280+53/60+20/3600)return 'ABH';return Math.floor(lon/(360/27))}
+function sbcSignNaks(s,abh){const a=s*30,b=a+30,out=[];for(let n=0;n<27;n++){const lo=n*(360/27),hi=lo+360/27;let l=lo,h=hi;
+  if(abh==='in'){if(n===20)h=Math.min(h,276+40/60);if(n===21)l=Math.max(l,280+53/60+20/3600)}
+  if(l<b-1e-9&&h>a+1e-9)out.push(n)}
+  if(abh==='in'&&276+40/60<b&&280+53/60+20/3600>a)out.push('ABH');return out}
+/* ---- rule records (documented systems; pending ones stay disabled) ---- */
+const SBC_SRC={wiki:'Wikipedia “Sarvatobhadra Chakra” (secondary; cites Mansagari)',sar:'saravali.github.io – SBC basics / Vedhas (secondary)',hind:'hindupad.com – Sarvatobhadra Chakra (secondary)'};
+const SBC_RULES=[
+ ['SBC_GRID_001','Grid','Outer ring of 32 cells','28 nakshatras (7 per side) + 4 corner cells, counted clockwise; Krittika first on the east; Ashwini 6th in the upper row; Abhijit between Uttara Ashadha and Shravana.','Classical (secondary sources agree)',SBC_SRC.sar+'; '+SBC_SRC.hind+'; '+SBC_SRC.wiki,'Enabled – validated structure'],
+ ['SBC_GRID_002','Grid','Inner ring structure by position','Diagonals (corner to centre) = 16 swaras; remaining cells of the 2nd ring = 20 consonants; remaining cells of the 3rd ring = 12 rashis; 5 centre cells = weekdays / tithi groups. Counts agree across sources (28+12+5+16+20 = 81 with the 4 corner vowels).','Classical (secondary sources agree on counts)',SBC_SRC.wiki+'; '+SBC_SRC.hind,'Enabled – structure only'],
+ ['SBC_GRID_003','Grid','Exact letters, rashi order and tithi groups in inner cells','Which vowel, consonant, rashi or tithi group sits in which inner cell is not available as text in the sources consulted.','–','Not available in text form',SBC_PEND+' – cells show their category only; user may import verified contents'],
+ ['SBC_GRID_004','Grid','Centre weekday cells','Saturn centre, Jupiter left, Sun/Mars right, Venus top, Moon/Mercury bottom (as drawn, upper row at the top).','Classical (single source)',SBC_SRC.sar,'Enabled – single-source label'],
+ ['SBC_ABH_001','Grid','Abhijit excluded','27 nakshatras; Abhijit cell kept in place but empty.','Practice (documented alternative)',SBC_SRC.sar,'Enabled – preference'],
+ ['SBC_ABH_002','Grid','Abhijit included','Abhijit = last quarter of Uttara Ashadha (from 276°40′) and first fifteenth of Shravana (to 280°53′20″).','Practice (documented alternative)',SBC_SRC.sar,'Enabled – preference (default)'],
+ ['SBC_VED_001A','Vedha','Nakshatra Vedha – motion profile A','Planet in direct, normal motion casts the opposite (straight) vedha; retrograde planets the backward vedha; the Sun and the two nodes cast fixed opposite + forward + backward vedha. “Accelerated → left vedha” is stated but its speed threshold and the left/right mapping are not defined.','Classical (as quoted by Wikipedia)',SBC_SRC.wiki,'Enabled – accelerated clause '+SBC_PEND],
+ ['SBC_VED_001B','Vedha','Nakshatra Vedha – motion profile B','Forward (diagonal clockwise) vedha = planet in direct motion; backward (diagonal anticlockwise) = retrograde; opposite (straight) = stationary planet.','Classical (secondary)',SBC_SRC.sar,'Enabled – stationary threshold is an engine parameter'],
+ ['SBC_VED_001C','Vedha','Nakshatra Vedha – all three lines','Every planet in a border nakshatra casts vedha along the opposite, forward and backward lines; the backward line is described as most prominent for retrograde planets.','Classical (secondary)',SBC_SRC.hind,'Enabled'],
+ ['SBC_VED_002','Vedha','Custom line choice (user-defined)','The user chooses which lines direct and retrograde planets cast. Not a classical rule.','User-defined','–','Enabled – user-defined'],
+ ['SBC_VED_101','Vedha','Rashi, Tithi, Weekday, Akshara and Swara vedha','Needs the verified inner-cell contents (SBC_GRID_003).','–','–',SBC_PEND+' – disabled'],
+ ['SBC_VED_102','Vedha','Zodiac-point vedha (rule of three)','Each zodiac point has three vedhas found by proportion on the planet\'s longitude.','Classical (secondary)',SBC_SRC.sar,SBC_PEND+' – disabled (counting not fully specified)'],
+ ['SBC_DRI_001','Drishti','Sarvatobhadra Chakra Drishti','No Sarvatobhadra-specific drishti rule is documented in the sources consulted. Ordinary Parashari aspects are NOT substituted for it.','–','–',SBC_PEND+' – disabled'],
+ ['SBC_DRI_002','Drishti','Parashari graha drishti (separate system)','Sign-based aspects (7th for all planets; Mars 4/8, Jupiter 5/9, Saturn 3/10, nodes 5/9 as used elsewhere in ASTROSUTRAS) mapped to the nakshatras lying in the aspected signs.','Classical Parashari (not SBC)','ASTROSUTRAS aspect table','Enabled – separate system'],
+ ['SBC_DRI_003','Drishti','Jaimini rashi drishti (separate system)','Sign aspects of the Jaimini system mapped to the nakshatras in the aspected signs.','Classical Jaimini (not SBC)','ASTROSUTRAS Jaimini routine','Enabled – separate system'],
+ ['SBC_DRI_004','Drishti','Custom sign-distance drishti (user-defined)','The user enters the sign distances (e.g. 5,7,9) counted from the planet\'s sign.','User-defined','–','Enabled – user-defined'],
+ ['SBC_DRI_101','Drishti','Nakshatra-based drishti','No verified counting rule located.','–','–',SBC_PEND+' – disabled'],
+ ['SBC_INT_001','Interpretation','Significance of a planet\'s vedha','Sun: grief; Mars: loss of wealth; Saturn: pain and ailments; Rahu/Ketu: obstructions; Moon: mixed events; Venus: fear from enemies; Mercury: sharpened intellect; Jupiter: many gains. Stronger when exalted or retrograde, weaker when debilitated; a favourable vedha can cancel an adverse one.','Classical (as quoted by Wikipedia)',SBC_SRC.wiki,'Enabled – wording only'],
+ ['SBC_INT_002','Interpretation','Number of vedhas on one nakshatra','Mansagari (as quoted): one vedha – conflict; two – loss of wealth; three – defeat; four – extreme adversity (the text says death). Read as a classical symbolic statement, never as a prediction.','Classical (as quoted by Wikipedia)',SBC_SRC.wiki,'Enabled – wording only']
+].map(r=>({id:r[0],system:r[1],name:r[2],def:r[3],tradition:r[4],source:r[5],status:r[6],validation:'Secondary sources – primary text NOT verified',approval:'PENDING – Product Owner approval required',version:SBC_VER}));
+/* ---- state / preferences (dropdown driven, remembered) ---- */
+const SBC_DEF={dri:'parashari',ved:'A',abh:'in',thr:'off',dpl:'all',dcus:PLANETS.slice(),vpl:'all',vcus:PLANETS.slice(),dOn:1,vOn:1,nOn:1,tOn:1,mode:'multi',view:'trad',zoom:100,d1:'comp',off:'5,7,9',cd:['opposite'],cr:['backward'],inner:{},ms:null,tz:null,chart:null,sel:[],exp:0,last:null};
+function sbs(){if(!V.sb)V.sb=Object.assign({},SBC_DEF,JSON.parse(JSON.stringify((S.ui&&S.ui.sbc)||{})));return V.sb}
+function sbcSet(k,v){const s=sbs();s[k]=v;S.ui=S.ui||{};S.ui.sbc=Object.assign({},s,{sel:[],last:null,ms:null});save();render()}
+function sbcReset(){V.sb=Object.assign({},SBC_DEF);S.ui=S.ui||{};delete S.ui.sbc;save();render()}
+function sbcPlist(mode,cus){return mode==='all'?PLANETS.slice():mode==='custom'?cus.slice():[mode]}
+function sbcTog(k,p){const s=sbs(),a=s[k].slice(),i=a.indexOf(p);if(i<0)a.push(p);else a.splice(i,1);sbcSet(k,a)}
+function sbcLines(k,l){const s=sbs(),a=s[k].slice(),i=a.indexOf(l);if(i<0)a.push(l);else a.splice(i,1);sbcSet(k,a)}
+/* ---- positions (uses the existing ASTROSUTRAS transit engine; no second ephemeris) ---- */
+function sbcPos(c,C,ms,abh){
+  const T=transitAll(c,C,ms),T1=transitAll(c,C,ms+43200000),T0=transitAll(c,C,ms-43200000),sun=T.Sun.lon,out={};
+  PLANETS.forEach(n=>{
+    let sp=T1[n].lon-T0[n].lon;if(sp>180)sp-=360;if(sp<-180)sp+=360;
+    const lon=T[n].lon,nk=sbcNakOf(lon,abh),cell=SBC_NAKCELL[nk];
+    const orb={Moon:12,Mars:17,Mercury:14,Jupiter:11,Venus:10,Saturn:15}[n];
+    out[n]={n,lon,sign:T[n].sign,deg:T[n].deg,nakOrig:T[n].nak,nak:nk,pada:T[n].pada,retro:!!T[n].retro,speed:sp,cell,comb:!!orb&&ang(lon,sun)<orb};
+  });
+  return out;
+}
+function sbcAspSigns(p,sign,st){
+  if(st.dri==='jaimini')return rashiAsp(sign);
+  if(st.dri==='custom'){return String(st.off||'').split(',').map(x=>parseInt(x,10)).filter(x=>x>=1&&x<=12).map(x=>(sign+x-1)%12)}
+  return (ASPECTS[p]||[7]).map(k=>(sign+k-1)%12);
+}
+function sbcLinesFor(p,st){
+  const retro=p.retro,fix=['Sun','Rahu','Ketu'].includes(p.n);
+  if(st.ved==='A')return fix?['opposite','forward','backward']:retro?['backward']:['opposite'];
+  if(st.ved==='B'){const thr=st.thr==='off'?-1:+st.thr;if(thr>=0&&Math.abs(p.speed)<=thr)return ['opposite'];return retro?['backward']:['forward']}
+  if(st.ved==='C')return ['opposite','forward','backward'];
+  if(st.ved==='custom')return retro?st.cr:st.cd;
+  return [];
+}
+const SBC_DRI_OK=['parashari','jaimini','custom'],SBC_VED_OK=['A','B','C','custom'];
+function sbcAnalyse(c,C,st){
+  const abh=st.abh,ms=st.ms,N=sbcPos(c,C,C.ms,abh),T=sbcPos(c,C,ms,abh);
+  const dp=sbcPlist(st.dpl,st.dcus),vp=sbcPlist(st.vpl,st.vcus);
+  const srcs=[];if(st.nOn)PLANETS.forEach(n=>srcs.push({set:'N',key:'N:'+n,p:N[n]}));if(st.tOn)PLANETS.forEach(n=>srcs.push({set:'T',key:'T:'+n,p:T[n]}));
+  const inf={};const cinf=k=>inf[k]||(inf[k]={dri:[],ved:[],path:[]});
+  const drishti=[],vedha=[];
+  if(st.dOn&&SBC_DRI_OK.includes(st.dri))srcs.filter(s=>dp.includes(s.p.n)).forEach(s=>{
+    const signs=sbcAspSigns(s.p.n,s.p.sign,st);const cells=[];signs.forEach(g=>sbcSignNaks(g,abh).forEach(n=>{const x=SBC_NAKCELL[n];if(x&&!cells.includes(x))cells.push(x)}));
+    drishti.push({src:s,signs,cells});cells.forEach(x=>cinf(x.id).dri.push(s));
+  });
+  if(st.vOn&&SBC_VED_OK.includes(st.ved))srcs.filter(s=>vp.includes(s.p.n)).forEach(s=>{
+    const x=s.p.cell;if(!x||x.kind!=='nak')return;
+    sbcLinesFor(s.p,st).forEach(l=>{const L=sbcLine(x,l);if(!L.target)return;vedha.push({src:s,line:l,from:x,target:L.target,path:L.path});cinf(L.target.id).ved.push({s,line:l});L.path.forEach(pc=>cinf(pc.id).path.push(s))});
+  });
+  return {N,T,srcs,dp,vp,drishti,vedha,inf};
+}
+/* ---- page ---- */
+function sbcCellHTML(x,A,st){
+  const sel=st.sel.includes(x.id),i=A.inf[x.id]||{dri:[],ved:[],path:[]},hasD=i.dri.length>0,hasV=i.ved.length>0;
+  const cls=['sbc-c','k-'+x.kind];if(sel)cls.push('sel');if(hasD&&hasV)cls.push('both');else if(hasD)cls.push('dri');else if(hasV)cls.push('ved');else if(i.path.length)cls.push('pth');
+  let txt='';
+  const user=st.inner[x.id];
+  if(x.kind==='nak'){txt=`<b>${x.nak==='ABH'&&st.abh==='out'?'<s>Abhi</s>':sbcShort(x.nak)}</b>`+(st.view==='trad'?`<span class="n">${x.nak==='ABH'?'28':x.nak+1}</span>`:'')}
+  else if(x.kind==='corner')txt='<span class="n">sw</span>';
+  else if(x.wd)txt=`<span class="n">${esc(x.wd.split(' · ')[0].replace('Sunday / Tuesday','Sun/Tue').replace('Monday / Wednesday','Mon/Wed').replace('Friday','Fri').replace('Thursday','Thu').replace('Saturday','Sat'))}</span>`;
+  else txt=`<span class="n">${{swara:'sw',akshara:'ak',rashi:'ra'}[x.kind]||''}</span>`;
+  if(user)txt=`<b>${esc(user)}</b>`;
+  const chips=[];PLANETS.forEach(n=>{if(A.N[n].cell===x&&st.nOn)chips.push(`<i class="pc nat">${AB[n]}</i>`);if(A.T[n].cell===x&&st.tOn)chips.push(`<i class="pc trn">${AB[n]}</i>`)});
+  return `<button class="${cls.join(' ')}" onclick="sbcClick('${x.id}')" title="${esc(sbcCellTitle(x))}">${txt}<span class="ch">${chips.join('')}</span></button>`;
+}
+function sbcCellTitle(x){return x.id+' · '+(x.nak!==null?(sbcName(x.nak)+' nakshatra'):x.kind==='corner'?'corner (vowel) '+x.corner:x.wd?x.wd:x.kind+' cell')}
+function sbcClick(id){const s=sbs();s.last=id;if(s.mode==='single')s.sel=s.sel.includes(id)&&s.sel.length===1?[]:[id];else{const i=s.sel.indexOf(id);if(i<0)s.sel.push(id);else s.sel.splice(i,1)}render()}
+function sbcSelPlanet(v){if(!v)return;const A=V.sbA;if(!A)return;const s=sbs();const add=[];['N','T'].forEach(k=>{const p=A[k][v];if(p&&p.cell&&!s.sel.includes(p.cell.id))add.push(p.cell.id)});s.sel=s.mode==='single'?add.slice(0,1):s.sel.concat(add);s.last=add[0]||s.last;render()}
+function sbcSelNak(v){if(v==='')return;const n=v==='ABH'?'ABH':+v,x=SBC_NAKCELL[n],s=sbs();if(!x)return;if(!s.sel.includes(x.id))s.sel=s.mode==='single'?[x.id]:s.sel.concat(x.id);s.last=x.id;render()}
+function sbcSelRashi(v){if(v==='')return;const s=sbs(),ids=sbcSignNaks(+v,s.abh).map(n=>SBC_NAKCELL[n]).filter(Boolean).map(x=>x.id);s.sel=s.mode==='single'?ids.slice(0,1):[...new Set(s.sel.concat(ids))];s.last=ids[0]||s.last;render()}
+function sbcClear(){const s=sbs();s.sel=[];s.last=null;render()}
+function sbcTime(ms,tz){return new Date(ms+tz*3600000).toISOString().slice(0,16)}
+function sbcSetTime(v,tz){if(!v)return;const m=v.match(/(\d+)-(\d+)-(\d+)T(\d+):(\d+)/);if(!m)return;const s=sbs();s.ms=Date.UTC(+m[1],+m[2]-1,+m[3],+m[4],+m[5])-tz*3600000;render()}
+function sbcShift(d){const s=sbs();s.ms=(s.ms||Date.now())+d*86400000;render()}
+function sbcInnerApply(){const t=document.getElementById('sbc-in').value.trim();try{const o=t?JSON.parse(t):{};if(typeof o!=='object'||Array.isArray(o))throw 0;const ok={};Object.keys(o).forEach(k=>{if(/^R[1-9]C[1-9]$/.test(k)&&SBC_CELLS[k[1]+','+k[3]].kind!=='nak'&&SBC_CELLS[k[1]+','+k[3]].kind!=='corner')ok[k]=String(o[k]).slice(0,8)});sbcSet('inner',ok)}catch(e){alert('Please paste a JSON object such as {"R2C2":"क","R3C4":"मेष"}. Only inner cells can be filled; the nakshatra ring is fixed.')}}
+function vSBC(){
+  const c=sbs().chart&&S.charts.find(x=>x.id===sbs().chart)||curChart();if(!c)return NOCHART;
+  const st=sbs();st.chart=c.id;const C=getC(c),tz=st.tz!==null&&st.tz!==undefined?st.tz:c.tz;
+  if(!st.ms)st.ms=Date.now();
+  const A=sbcAnalyse(c,C,st);V.sbA=A;
+  const sel=(k,arr)=>opt(arr,st[k]);
+  const dri=[['parashari','Parashari graha drishti (separate system)'],['jaimini','Jaimini rashi drishti (separate system)'],['custom','Custom sign distances (user-defined)'],['sbc','Sarvatobhadra Chakra Drishti – RESEARCH PENDING (disabled)'],['nk','Nakshatra-based Drishti – RESEARCH PENDING (disabled)']];
+  const ved=[['A','Nakshatra Vedha – profile A (direct: opposite · retro: backward · Sun/nodes: all)'],['B','Nakshatra Vedha – profile B (direct: forward · retro: backward · stationary: opposite)'],['C','Nakshatra Vedha – all three lines for every planet'],['custom','Custom line choice (user-defined)'],['rs','Rashi / Tithi / Weekday / Akshara Vedha – RESEARCH PENDING (disabled)']];
+  const plOpts=[['all','All planets'],['custom','Custom selection']].concat(PLANETS.map(p=>[p,p]));
+  const dis=(arr,ok)=>arr.map(([v,l])=>`<option value="${v}"${ok.includes(v)?'':' disabled'}${String(v)===String(st[arr===dri?'dri':'ved'])?' selected':''}>${esc(l)}</option>`).join('');
+  const chk=(k,items,label)=>`<span class="row" style="gap:4px"><span class="mute">${label}</span>${items.map(p=>`<label style="display:inline-flex;gap:3px;align-items:center;margin:0;font-size:12px;color:var(--ink)"><input type="checkbox" ${st[k].includes(p)?'checked':''} onchange="sbcTog('${k}','${p}')" style="width:auto"><span translate="no">${p}</span></label>`).join('')}</span>`;
+  const onoff=(k,l)=>`<label style="display:inline-flex;gap:4px;align-items:center;margin:0;font-size:13px;color:var(--ink)"><input type="checkbox" ${st[k]?'checked':''} onchange="sbcSet('${k}',this.checked?1:0)" style="width:auto"> ${l}</label>`;
+  const tzf=`<span>UTC offset <input type="number" step="0.25" value="${tz}" style="width:80px" onchange="sbcSet('tz',+this.value)"></span>`;
+  const natMs=C.ms;
+  const head=`<div class="card"><div class="row"><h2 style="margin:0">Sarvatobhadra Chakra – Drishti &amp; Vedha analysis</h2><span class="mute">Natal horoscope:</span><select onchange="sbcSet('chart',this.value)">${opt(S.charts.map(x=>[x.id,x.name]),c.id)}</select><button class="sm" onclick="V.bd='new';go('birth')">＋ New horoscope</button></div>
+   <p class="mute" style="margin:6px 0 0">The Chakra is the working surface: click cells, choose rules and planets from the lists, pick the transit date, and read the result and summary at the bottom. Sarvatobhadra Vedha, Parashari/Jaimini Drishti and any Sarvatobhadra-specific Drishti are kept as <b>three separate rule systems</b>. Rules not verified from a primary source are marked <b>${SBC_PEND}</b> and are disabled.</p></div>`;
+  const when=`<div class="card noprint"><div class="row"><b>SELECT TRANSIT DATE</b><input type="datetime-local" value="${sbcTime(st.ms,tz)}" onchange="sbcSetTime(this.value,${tz})">${tzf}
+   <button class="sm" onclick="sbs().ms=null;render()">Today / now</button><button class="sm" onclick="sbs().ms=${natMs};render()">Reset to natal date</button><button class="sm" onclick="sbcShift(-1)">◀ Previous day</button><button class="sm" onclick="sbcShift(1)">Next day ▶</button></div>
+   <p class="mute" style="margin:6px 0 0">Planetary longitudes depend on the date and time only (not on the place). The same ayanamsa and node settings as the chosen horoscope are used. The offset converts your local time to UTC.</p></div>`;
+  const rules=`<div class="card noprint"><div class="row" style="align-items:flex-end;gap:10px 16px">
+   <label style="margin:0">SELECT DRISHTI RULE<br><select onchange="sbcSet('dri',this.value)">${dis(dri,SBC_DRI_OK)}</select></label>
+   <label style="margin:0">SELECT PLANETS FOR DRISHTI<br><select onchange="sbcSet('dpl',this.value)">${sel('dpl',plOpts)}</select></label>
+   <label style="margin:0">SELECT VEDHA RULE<br><select onchange="sbcSet('ved',this.value)">${dis(ved,SBC_VED_OK)}</select></label>
+   <label style="margin:0">SELECT PLANETS FOR VEDHA<br><select onchange="sbcSet('vpl',this.value)">${sel('vpl',plOpts)}</select></label></div>
+   ${st.dpl==='custom'?`<div style="margin-top:6px">${chk('dcus',PLANETS,'Drishti planets:')}</div>`:''}${st.vpl==='custom'?`<div style="margin-top:6px">${chk('vcus',PLANETS,'Vedha planets:')}</div>`:''}
+   ${st.dri==='custom'?`<div style="margin-top:6px" class="row"><span class="mute">Custom sign distances (comma separated, 1–12):</span><input value="${esc(st.off)}" style="width:120px" onchange="sbcSet('off',this.value)"> <span class="mute">User-defined rule – not a classical rule.</span></div>`:''}
+   ${st.ved==='B'?`<div style="margin-top:6px" class="row"><span class="mute">Treat a planet as stationary when its daily motion is within:</span><select onchange="sbcSet('thr',this.value)">${opt([['off','Never (not applied)'],['0.02','0.02°/day'],['0.05','0.05°/day'],['0.10','0.10°/day']],st.thr)}</select><span class="mute">Engine parameter – the source gives no threshold.</span></div>`:''}
+   ${st.ved==='custom'?`<div style="margin-top:6px" class="row"><span class="mute">Direct planets cast:</span>${['opposite','forward','backward'].map(l=>`<label style="display:inline-flex;gap:3px;align-items:center;margin:0;font-size:12px;color:var(--ink)"><input type="checkbox" ${st.cd.includes(l)?'checked':''} onchange="sbcLines('cd','${l}')" style="width:auto">${l}</label>`).join('')}<span class="mute">· Retrograde planets cast:</span>${['opposite','forward','backward'].map(l=>`<label style="display:inline-flex;gap:3px;align-items:center;margin:0;font-size:12px;color:var(--ink)"><input type="checkbox" ${st.cr.includes(l)?'checked':''} onchange="sbcLines('cr','${l}')" style="width:auto">${l}</label>`).join('')}<span class="mute">User-defined – not a classical rule.</span></div>`:''}
+   <div class="row" style="margin-top:10px;gap:8px 16px">${onoff('dOn','Drishti ON')}${onoff('vOn','Vedha ON')}${onoff('nOn','Show natal influence')}${onoff('tOn','Show transit influence')}
+    <label style="margin:0;display:inline-flex;gap:4px;align-items:center">Abhijit <select onchange="sbcSet('abh',this.value)">${opt([['in','Included (28 nakshatras)'],['out','Excluded (27 nakshatras)']],st.abh)}</select></label>
+    <label style="margin:0;display:inline-flex;gap:4px;align-items:center">Selection <select onchange="sbcSet('mode',this.value)">${opt([['multi','Multiple selection'],['single','Single selection']],st.mode)}</select></label>
+    <label style="margin:0;display:inline-flex;gap:4px;align-items:center">View <select onchange="sbcSet('view',this.value)">${opt([['trad','Traditional'],['simple','Simplified']],st.view)}</select></label>
+    <label style="margin:0;display:inline-flex;gap:4px;align-items:center">Zoom <select onchange="sbcSet('zoom',+this.value)">${opt([[70,'70%'],[85,'85%'],[100,'100%'],[125,'125%'],[150,'150%']],st.zoom)}</select></label>
+    <button class="sm" onclick="sbcReset()">Reset all preferences</button></div></div>`;
+  const picks=`<div class="card noprint"><div class="row"><b>Select from the list</b>
+   <select onchange="sbcSelPlanet(this.value);this.value=''"><option value="">Planet…</option>${PLANETS.map(p=>`<option>${p}</option>`).join('')}</select>
+   <select onchange="sbcSelNak(this.value);this.value=''"><option value="">Nakshatra…</option>${NAKS.map((n,i)=>`<option value="${i}">${i+1}. ${n}</option>`).join('')}<option value="ABH">28. Abhijit</option></select>
+   <select onchange="sbcSelRashi(this.value);this.value=''"><option value="">Rashi (its nakshatras)…</option>${SIGNS.map((n,i)=>`<option value="${i}">${n}</option>`).join('')}</select>
+   <button class="sm" onclick="sbcClear()">Clear selection</button><span class="mute">Tithi, weekday-rashi and akshara selection need the verified inner-cell contents (${SBC_PEND}); inner cells can still be clicked.</span></div></div>`;
+  const grid=`<div class="card"><div style="overflow:auto"><div class="sbc" style="--sz:${Math.round(58*st.zoom/100)}px">${[1,2,3,4,5,6,7,8,9].map(r=>[1,2,3,4,5,6,7,8,9].map(cc=>sbcCellHTML(sbcCell(r,cc),A,st)).join('')).join('')}</div></div>
+   <div class="row" style="margin-top:8px;font-size:12px"><span class="lg sel"></span>Selected position <span class="lg dri"></span>Drishti <span class="lg ved"></span>Vedha <span class="lg both"></span>Drishti + Vedha <span class="lg pth"></span>Vedha line (path) <i class="pc nat">Su</i>Natal planet <i class="pc trn">Su</i>Transit planet <span class="mute">Colours are interface conventions, not strengths. Grey inner cells show only their category (sw = swara, ak = akshara, ra = rashi).</span></div></div>`;
+  const info=sbcInfo(A,st,c);
+  return head+when+rules+picks+grid+info+sbcTables(c,C,A,st)+sbcD1(c,C,A,st)+sbcResult(c,C,A,st)+sbcRulesCard(st);
+}
+function sbcInfo(A,st,c){
+  const x=st.last&&SBC_CELLS[st.last[1]+','+st.last[3]];if(!x)return '<div class="card mute noprint">Click a cell of the Chakra to see its element and the influences on it.</div>';
+  const i=A.inf[x.id]||{dri:[],ved:[],path:[]},occ=[];PLANETS.forEach(n=>{if(A.N[n].cell===x)occ.push('natal '+n);if(A.T[n].cell===x)occ.push('transit '+n)});
+  const rng=x.nak!==null&&x.nak!=='ABH'?(Math.round(x.nak*360/27*100)/100)+'° – '+(Math.round((x.nak+1)*360/27*100)/100)+'° (sidereal longitude)':x.nak==='ABH'?'276°40′ – 280°53′20″ (when included)':'';
+  return `<div class="card"><h3 style="margin-top:0">Cell ${x.id} <span class="tag">${x.kind}</span></h3><table style="font-size:13px">
+   <tr><td class="mute" style="width:160px">Element</td><td>${x.nak!==null?'<b translate="no">'+sbcName(x.nak)+'</b> (nakshatra '+(x.nak==='ABH'?28:x.nak+1)+')':x.kind==='corner'?'Corner (vowel) – '+esc(x.corner)+'. Which vowel: '+SBC_PEND:x.wd?'Weekday cell – '+esc(x.wd):x.kind==='swara'?'Swara (vowel) cell – which vowel: '+SBC_PEND:x.kind==='akshara'?'Akshara (consonant) cell – which letter: '+SBC_PEND:x.kind==='rashi'?'Rashi cell – which rashi: '+SBC_PEND:'Centre cell'}</td></tr>
+   ${rng?`<tr><td class="mute">Zodiac range</td><td>${rng}</td></tr>`:''}<tr><td class="mute">Planets in this cell</td><td translate="no">${occ.join(', ')||'none'}</td></tr>
+   <tr><td class="mute">Drishti on this cell</td><td translate="no">${i.dri.map(s=>(s.set==='N'?'natal ':'transit ')+s.p.n).join(', ')||'none'}</td></tr>
+   <tr><td class="mute">Vedha on this cell</td><td translate="no">${i.ved.map(v=>(v.s.set==='N'?'natal ':'transit ')+v.s.p.n+' ('+v.line+')').join(', ')||'none'}</td></tr></table></div>`;
+}
+function sbcTables(c,C,A,st){
+  const x=st.exp;
+  const rows=PLANETS.map(n=>{const a=A.N[n],b=A.T[n];const mo=p=>p.retro&&n!=='Rahu'&&n!=='Ketu'?'Retrograde':(n==='Rahu'||n==='Ketu')?'Retrograde (node)':'Direct';
+    const cc=p=>p.cell?p.cell.id+' · '+(p.nak==='ABH'?'Abhijit':NAKS[p.nak]):'–';
+    const base=`<td translate="no"><b>${n}</b></td><td>${SIGNS[a.sign]} ${dms(a.deg)}</td><td translate="no">${sbcName(a.nak)}-${a.pada}</td><td>${a.cell?a.cell.id:'–'}</td><td>${mlDeg(b.lon)}</td><td>${SIGNS[b.sign]}</td><td>${dms(b.deg)}</td><td translate="no">${sbcName(b.nak)}</td><td>${b.pada}</td><td>${mo(b)}</td><td>${b.cell?b.cell.id:'–'}</td>`;
+    const ex=x?`<td>${b.speed.toFixed(3)}°/d</td><td>${b.comb?'combust':'–'}</td><td translate="no">${DORD[b.nakOrig%9]}</td><td translate="no">${LORD[b.sign]}</td><td translate="no">${LORD[b.sign]===n?'itself (own sign)':LORD[b.sign]+' in '+SIGNS[(A.T[LORD[b.sign]]||{}).sign]}</td>`:'';
+    return `<tr>${base}${ex}</tr>`}).join('');
+  return `<div class="card"><div class="row"><h3 style="margin:0">Planetary details – natal and transit (${new Date(st.ms).toISOString().slice(0,16).replace('T',' ')} UTC)</h3><label style="display:inline;margin:0 0 0 auto"><input type="checkbox" ${x?'checked':''} onchange="sbcSet('exp',this.checked?1:0)" style="width:auto"> Expanded view</label></div>
+   <div style="overflow-x:auto"><table><tr><th rowspan="2">Planet</th><th colspan="3" style="text-align:center;color:var(--acc)">Natal</th><th colspan="7" style="text-align:center;color:var(--acc)">Transit</th>${x?'<th colspan="5" style="text-align:center;color:var(--acc)">Transit – detail</th>':''}</tr>
+   <tr><th>Rashi · degree</th><th>Nakshatra-pada</th><th>Cell</th><th>Longitude</th><th>Rashi</th><th>Degree</th><th>Nakshatra</th><th>Pada</th><th>Motion</th><th>Cell</th>${x?'<th>Speed</th><th>Combustion</th><th>Nakshatra lord</th><th>Rashi lord</th><th>Dispositor</th>':''}</tr>${rows}</table></div>
+   <p class="mute" style="margin-bottom:0">Same ayanamsa and node settings as the horoscope. Combustion uses the usual orbs. Planets in the Abhijit cell appear only when Abhijit is included.</p></div>`;
+}
+function sbcD1(c,C,A,st){
+  const m=st.d1,it=Array.from({length:12},()=>[]);
+  it[C.lagna].push('As');
+  const retro=p=>p.retro&&p.n!=='Rahu'&&p.n!=='Ketu'?'ʳ':'';
+  if(m!=='trn')PLANETS.forEach(n=>it[A.N[n].sign].push(AB[n]+retro(A.N[n])));
+  if(m!=='nat')PLANETS.forEach(n=>it[A.T[n].sign].push('~'+AB[n]+retro(A.T[n])));
+  const title=m==='nat'?'Natal D1':m==='trn'?'Transit (natal Lagna)':'Natal + transit';
+  const svg=V.style==='south'?southSVG(it,C.lagna,title):northSVG(it,C.lagna,title);
+  return `<div class="card"><div class="row"><h3 style="margin:0">D1 Rashi chart</h3><select onchange="sbcSet('d1',this.value)">${opt([['nat','Natal chart only'],['trn','Transit chart only'],['comp','Natal + transit composite']],m)}</select><span class="mute">Chart style follows the setting at the top (${V.style==='south'?'South':'North'} Indian). Orange letters are transit planets.</span></div><div style="max-width:440px;margin:8px auto 0">${svg}</div></div>`;
+}
+/* ---- result + summary (bottom) ---- */
+function sbcResult(c,C,A,st){
+  const nm=s=>(s.set==='N'?'natal ':'transit ')+s.p.n,cellN=x=>x?(x.id+' '+(x.nak!==null?sbcName(x.nak):x.kind)):'–';
+  const selCells=st.sel.map(id=>SBC_CELLS[id[1]+','+id[3]]);
+  const dsel=A.drishti,vsel=A.vedha;
+  // influences on selected cells and on natal planets
+  const onSel=selCells.map(x=>({x,i:A.inf[x.id]||{dri:[],ved:[],path:[]}}));
+  const natPl=PLANETS.map(n=>({n,cell:A.N[n].cell}));
+  const cross=[];vsel.filter(v=>v.src.set==='T').forEach(v=>natPl.forEach(q=>{if(q.cell===v.target)cross.push({kind:'Vedha',src:v.src.p.n,line:v.line,natal:q.n,cell:v.target})}));
+  dsel.filter(d=>d.src.set==='T').forEach(d=>natPl.forEach(q=>{if(q.cell&&d.cells.includes(q.cell))cross.push({kind:'Drishti',src:d.src.p.n,line:'sign aspect',natal:q.n,cell:q.cell})}));
+  const nDri=dsel.reduce((a,d)=>a+d.cells.length,0),both=Object.entries(A.inf).filter(([k,v])=>v.dri.length&&v.ved.length).map(([k])=>k);
+  const sevCount={};vsel.forEach(v=>{const t=v.target.id;const mal=!(SBC_BEN.includes(v.src.p.n)||(v.src.p.n==='Moon'));(sevCount[t]=sevCount[t]||{mal:0,ben:0,cell:v.target})[mal?'mal':'ben']++});
+  const sevTxt=['','conflict (misunderstanding)','loss of wealth','defeat (illness)','extreme adversity – the text says death; a classical symbol, not a prediction'];
+  const tbl=(h,rows)=>rows.length?`<div style="overflow-x:auto"><table><tr>${h.map(x=>`<th>${x}</th>`).join('')}</tr>${rows.join('')}</table></div>`:'<p class="mute" style="margin:4px 0">None under the selected rules.</p>';
+  const dri=tbl(['Source planet','Source position','Affected nakshatra cells','Rule','Relationship'],dsel.map(d=>`<tr><td translate="no">${nm(d.src)}</td><td>${SIGNS[d.src.p.sign]} · ${cellN(d.src.p.cell)}</td><td>${d.cells.map(x=>sbcShort(x.nak)).join(', ')||'–'}</td><td>${st.dri==='parashari'?'SBC_DRI_002':st.dri==='jaimini'?'SBC_DRI_003':'SBC_DRI_004'}</td><td>aspects ${d.signs.map(g=>SIGNS[g]).join(', ')}</td></tr>`));
+  const ved=tbl(['Source planet','Source cell','Line','Vedha (target) cell','Rule','Significance'],vsel.map(v=>`<tr><td translate="no">${nm(v.src)}${v.src.p.retro&&!['Rahu','Ketu'].includes(v.src.p.n)?' (R)':''}</td><td>${cellN(v.from)}</td><td>${v.line}</td><td><b>${cellN(v.target)}</b></td><td>${{A:'SBC_VED_001A',B:'SBC_VED_001B',C:'SBC_VED_001C',custom:'SBC_VED_002'}[st.ved]}</td><td>${SBC_PLC[v.src.p.n]} (SBC_INT_001)</td></tr>`));
+  const selT=tbl(['Selected cell','Element','Planets in it','Drishti on it','Vedha on it'],onSel.map(({x,i})=>`<tr><td>${x.id}</td><td>${x.nak!==null?sbcName(x.nak):x.kind}</td><td translate="no">${PLANETS.filter(n=>A.N[n].cell===x).map(n=>'natal '+n).concat(PLANETS.filter(n=>A.T[n].cell===x).map(n=>'transit '+n)).join(', ')||'–'}</td><td translate="no">${i.dri.map(nm).join(', ')||'–'}</td><td translate="no">${i.ved.map(v=>nm(v.s)+' ('+v.line+')').join(', ')||'–'}</td></tr>`));
+  const crossT=tbl(['Kind','Transit planet','Line / rule','Natal planet affected','Cell'],cross.map(q=>`<tr><td>${q.kind}</td><td translate="no">${q.src}</td><td>${q.line}</td><td translate="no">${q.natal}</td><td>${cellN(q.cell)}</td></tr>`));
+  const ctx=PLANETS.filter(n=>A.vp.includes(n)||A.dp.includes(n)).map(n=>{const b=A.T[n],a=A.N[n];return `<tr><td translate="no">${n}</td><td>${SIGNS[b.sign]} ${dms(b.deg)} · ${sbcName(b.nak)}-${b.pada}</td><td>${b.retro&&!['Rahu','Ketu'].includes(n)?'retrograde':'direct'}${b.comb?' · combust':''}</td><td>${EXALT[n]===b.sign?'exalted':DEBIL[n]===b.sign?'debilitated':LORD[b.sign]===n?'own sign':'–'}</td><td translate="no">${LORD[b.sign]}</td><td>${SIGNS[a.sign]} · ${sbcName(a.nak)}-${a.pada}</td></tr>`}).join('');
+  const reinforce=both.length?`Cells influenced by both Drishti and Vedha: ${both.map(id=>cellN(SBC_CELLS[id[1]+','+id[3]])).join('; ')}. Both influences are shown; neither hides the other.`:'No cell is touched by both Drishti and Vedha.';
+  const final=[];
+  if(!vsel.length&&!dsel.length)final.push('No Drishti or Vedha is identified under the selected rules, planets and date, so no influence is reported.');
+  Object.values(sevCount).forEach(s=>{const n=Math.min(4,s.mal),b=s.ben;if(s.mal||b)final.push(`${cellN(s.cell)} receives ${s.mal} vedha${s.mal===1?'':'s'} from malefic and ${b} from benefic planets. ${s.mal?'Classical text (SBC_INT_002): '+sevTxt[n]+'.':''} ${b&&s.mal?'A favourable vedha can cancel an adverse one (SBC_INT_001).':''}`)});
+  cross.forEach(q=>final.push(`Transit ${q.src} reaches natal ${q.natal} through ${q.kind==='Vedha'?q.line+' vedha':'sign aspect'} (${cellN(q.cell)}). Classical significance of ${q.src}'s vedha: ${SBC_PLC[q.src]} (SBC_INT_001); read with the planet's dignity and motion shown above.`));
+  const rid=new Set();if(st.dOn&&SBC_DRI_OK.includes(st.dri))rid.add(st.dri==='parashari'?'SBC_DRI_002':st.dri==='jaimini'?'SBC_DRI_003':'SBC_DRI_004');if(st.vOn&&SBC_VED_OK.includes(st.ved))rid.add({A:'SBC_VED_001A',B:'SBC_VED_001B',C:'SBC_VED_001C',custom:'SBC_VED_002'}[st.ved]);rid.add('SBC_GRID_001');rid.add('SBC_GRID_002');rid.add(st.abh==='in'?'SBC_ABH_002':'SBC_ABH_001');rid.add('SBC_INT_001');rid.add('SBC_INT_002');
+  const nakCount=Object.entries(A.inf).filter(([k,v])=>v.ved.length||v.dri.length).length;
+  const summary=`<div class="card" style="border:2px solid var(--acc)"><h3 style="margin-top:0;color:var(--acc)">SUMMARY</h3><table style="font-size:14px">
+   <tr><td class="mute" style="width:230px">Horoscope · transit date</td><td><b translate="no">${esc(c.name)}</b> · ${new Date(st.ms).toISOString().slice(0,16).replace('T',' ')} UTC</td></tr>
+   <tr><td class="mute">Rules in use</td><td>Drishti: ${st.dOn?esc((dri_name(st.dri))):'off'} · Vedha: ${st.vOn?esc(ved_name(st.ved)):'off'} · Abhijit ${st.abh==='in'?'included':'excluded'}</td></tr>
+   <tr><td class="mute">Planets used</td><td translate="no">Drishti: ${A.dp.join(', ')} · Vedha: ${A.vp.join(', ')}</td></tr>
+   <tr><td class="mute">Sources shown</td><td>${st.nOn?'natal ':''}${st.nOn&&st.tOn?'and ':''}${st.tOn?'transit':''}${!st.nOn&&!st.tOn?'none':''}</td></tr>
+   <tr><td class="mute">Selected positions</td><td>${selCells.length?selCells.map(x=>cellN(x)).join('; '):'none selected'}</td></tr>
+   <tr><td class="mute">Drishti results</td><td>${dsel.length} source(s) → ${nDri} nakshatra-cell hit(s)</td></tr>
+   <tr><td class="mute">Vedha results</td><td>${vsel.length} line(s) from ${new Set(vsel.map(v=>v.src.key)).size} planet(s)</td></tr>
+   <tr><td class="mute">Cells with both</td><td>${both.length}</td></tr>
+   <tr><td class="mute">Transit → natal influences</td><td>${cross.length?cross.map(q=>q.src+'→'+q.natal+' ('+q.kind+')').join('; '):'none'}</td></tr>
+   <tr><td class="mute">Rule records used</td><td>${[...rid].join(', ')}</td></tr>
+   <tr><td class="mute">Disabled (${SBC_PEND})</td><td>Sarvatobhadra-specific Drishti; rashi / tithi / weekday / akshara / swara Vedha; accelerated-planet clause; inner-cell contents</td></tr></table>
+   <p class="mute" style="margin-bottom:0">${final.length?esc(final[0]):'No influence identified.'}${final.length>1?' (+'+(final.length-1)+' more in the interpretation above)':''}</p></div>`;
+  return `<div class="card"><h3 style="margin-top:0">RESULT</h3>
+   <h4 style="margin:6px 0 2px">A. Selected positions</h4>${selT}
+   <h4 style="margin:10px 0 2px">B. Drishti results</h4>${dri}
+   <h4 style="margin:10px 0 2px">C. Vedha results</h4>${ved}
+   <h4 style="margin:10px 0 2px">D. Combined influence</h4><p style="margin:4px 0">Drishti only, Vedha only, both and none are distinguished by colour on the Chakra. ${esc(reinforce)}</p>
+   <h4 style="margin:10px 0 2px">Natal reference – transit influence on natal positions</h4>${crossT}
+   <h4 style="margin:10px 0 2px">E. Planetary context (transit | natal)</h4>${tbl(['Planet','Transit position','Motion','Dignity','Rashi lord / dispositor','Natal position'],[ctx])}
+   <h4 style="margin:10px 0 2px">F. Final interpretation</h4><ul style="margin:4px 0 0 18px">${final.map(t=>`<li>${esc(t)}</li>`).join('')||'<li>No influence identified.</li>'}</ul>
+   <p class="mute" style="margin-bottom:0">Every statement above is traceable to a rule record (shown in the summary and the rule library). Classical wordings are quoted as symbolic descriptions and are not predictions; the unverified rules are disabled and nothing has been invented to fill them.</p></div>`+summary;
+}
+const dri_name=v=>({parashari:'Parashari graha drishti',jaimini:'Jaimini rashi drishti',custom:'Custom sign distances'}[v]||v),ved_name=v=>({A:'Nakshatra Vedha – profile A',B:'Nakshatra Vedha – profile B',C:'Nakshatra Vedha – all three lines',custom:'Custom line choice'}[v]||v);
+function sbcRulesCard(st){
+  return `<div class="card"><details><summary><b>Rule library and sources</b> (${SBC_RULES.length} records – ${SBC_RULES.filter(r=>r.status.includes(SBC_PEND)).length} marked ${SBC_PEND})</summary>
+   <div class="row" style="margin:8px 0"><button class="sm" onclick="sbcExport()">Export analysis and rulebase (.json)</button><button class="sm" onclick="window.print()">Print / save as PDF</button></div>
+   <div style="overflow-x:auto"><table><tr><th>Rule ID</th><th>System</th><th>Name</th><th>Definition</th><th>Tradition</th><th>Source</th><th>Status</th><th>Approval</th></tr>${SBC_RULES.map(r=>`<tr><td>${r.id}</td><td>${r.system}</td><td>${esc(r.name)}</td><td style="font-size:12px">${esc(r.def)}</td><td>${esc(r.tradition)}</td><td style="font-size:12px">${esc(r.source)}</td><td>${esc(r.status)}</td><td style="font-size:12px">${esc(r.approval)}</td></tr>`).join('')}</table></div>
+   <h4 style="margin:12px 0 4px">Optional: inner-cell contents from a verified reference</h4><p class="mute" style="margin:0 0 4px">Paste a JSON object mapping inner cell ids to their letter or rashi, for example <code>{"R2C2":"क"}</code>. The nakshatra ring and corners cannot be changed. Contents you supply are displayed only; no Vedha or Drishti rule uses them until a verified rule exists.</p>
+   <textarea id="sbc-in" style="min-height:60px">${esc(Object.keys(st.inner).length?JSON.stringify(st.inner):'')}</textarea><div class="row"><button class="sm" onclick="sbcInnerApply()">Apply</button><button class="sm" onclick="sbcSet('inner',{})">Clear</button></div>
+   <p class="mute" style="margin-bottom:0">Sources consulted: ${Object.values(SBC_SRC).join('; ')}. All secondary; no primary Sanskrit text has been verified in this version.</p></details></div>`;
+}
+function sbcExport(){
+  const A=V.sbA,st=sbs();if(!A)return;
+  const cells=Object.values(SBC_CELLS).map(x=>({cell_id:x.id,row:x.r,column:x.c,ring:x.ring,element_type:x.kind,element_name:x.nak!==null?sbcName(x.nak):null,corner:x.corner,weekday:x.wd,content_status:x.nak!==null||x.corner||x.wd?'structure verified (secondary sources)':SBC_PEND,user_content:st.inner[x.id]||null}));
+  const out={format:'ASTROSUTRAS Sarvatobhadra Chakra analysis',generated_at:new Date().toISOString(),rule_version:SBC_VER,
+   preferences:{drishti_rule:st.dri,vedha_rule:st.ved,abhijit:st.abh,stationary_threshold:st.thr,drishti_planets:A.dp,vedha_planets:A.vp,show_natal:!!st.nOn,show_transit:!!st.tOn},
+   transit_utc:new Date(st.ms).toISOString(),selected_cells:st.sel,
+   tables:{sarvatobhadra_cell_mapping:cells,rule_master:SBC_RULES,
+    drishti_evaluation:A.drishti.map(d=>({source:d.src.key,source_cell:d.src.p.cell&&d.src.p.cell.id,aspected_signs:d.signs.map(g=>SIGNS[g]),affected_cells:d.cells.map(x=>x.id)})),
+    vedha_evaluation:A.vedha.map(v=>({source:v.src.key,source_cell:v.from.id,line:v.line,path_cells:v.path.map(x=>x.id),target_cell:v.target.id})),
+    planetary_details:{natal:Object.values(A.N).map(p=>({planet:p.n,longitude:p.lon,rashi:SIGNS[p.sign],nakshatra:sbcName(p.nak),pada:p.pada,retrograde:p.retro,cell:p.cell&&p.cell.id})),transit:Object.values(A.T).map(p=>({planet:p.n,longitude:p.lon,rashi:SIGNS[p.sign],nakshatra:sbcName(p.nak),pada:p.pada,retrograde:p.retro,speed_deg_per_day:p.speed,cell:p.cell&&p.cell.id}))}}};
+  dl('sarvatobhadra-analysis.json',JSON.stringify(out,null,1));
+}
+function sbcSelfTest(){
+  const res=[],t=(n,ok)=>res.push({n,ok:!!ok}),cs=Object.values(SBC_CELLS);
+  t('81 cells with unique ids',cs.length===81&&new Set(cs.map(x=>x.id)).size===81);
+  t('Outer ring: 28 nakshatra cells + 4 corners',cs.filter(x=>x.nak!==null).length===28&&cs.filter(x=>x.kind==='corner').length===4);
+  t('Every nakshatra (0–26 and Abhijit) appears exactly once',[...Array(27).keys(),'ABH'].every(n=>cs.filter(x=>x.nak===n).length===1));
+  t('Counts: 16 swara cells (12 diagonal + 4 corners), 20 akshara, 12 rashi, 5 centre/weekday cells',cs.filter(x=>x.kind==='swara').length+cs.filter(x=>x.kind==='corner').length===16&&cs.filter(x=>x.kind==='akshara').length===20&&cs.filter(x=>x.kind==='rashi').length===12&&cs.filter(x=>x.kind==='weekday').length===5);
+  t('Ashwini is the 6th nakshatra of the upper row (R1C7); Dhanishta first (R1C2)',SBC_NAKCELL[0].id==='R1C7'&&SBC_NAKCELL[22].id==='R1C2');
+  t('Krittika first on the east side (R2C9); Magha first on the bottom (R9C8); Anuradha first on the west (R8C1); Shravana last (R2C1)',SBC_NAKCELL[2].id==='R2C9'&&SBC_NAKCELL[9].id==='R9C8'&&SBC_NAKCELL[16].id==='R8C1'&&SBC_NAKCELL[21].id==='R2C1');
+  t('Abhijit sits between Uttara Ashadha and Shravana (R3C1)',SBC_NAKCELL.ABH.id==='R3C1');
+  const L=sbcLine(SBC_NAKCELL[0],'opposite'),F=sbcLine(SBC_NAKCELL[0],'forward'),B=sbcLine(SBC_NAKCELL[0],'backward');
+  t('Ashwini: opposite → Purva Phalguni, forward → Rohini, backward → Jyeshtha',L.target===SBC_NAKCELL[10]&&F.target===SBC_NAKCELL[3]&&B.target===SBC_NAKCELL[17]);
+  const nk=cs.filter(x=>x.nak!==null);
+  t('Every border nakshatra has 3 lines ending on a nakshatra cell',nk.every(x=>['opposite','forward','backward'].every(l=>{const q=sbcLine(x,l);return q.target&&q.target.nak!==null})));
+  t('Vedha is symmetric: forward of A ends at B ⇔ backward of B ends at A; opposite is mutual',nk.every(x=>{const f=sbcLine(x,'forward').target,b=sbcLine(f,'backward').target,o=sbcLine(x,'opposite').target;return b===x&&sbcLine(o,'opposite').target===x}));
+  t('Abhijit range 276°40′–280°53′20″ when included; absent when excluded',sbcNakOf(278,'in')==='ABH'&&sbcNakOf(278,'out')===20&&sbcNakOf(281,'in')===21&&sbcNakOf(276,'in')===20);
+  t('Nakshatra of longitude 0–13°20′ is Ashwini; 359° is Revati',sbcNakOf(5,'in')===0&&sbcNakOf(359,'in')===26);
+  const ok=res.filter(x=>x.ok).length;return {pass:ok,total:res.length,fail:res.filter(x=>!x.ok).map(x=>x.n)};
+}
+
 /* ============ KP – KRISHNAMURTI PADDHATI ============ */
 addTr([['KP','केपी','કેપી'],['Planets & Cusps','ग्रह और भाव-संधि','ગ્રહ અને ભાવ-સંધિ'],['Significators','कारक (सिग्निफिकेटर)','કારક (સિગ્નિફિકેટર)'],['Ruling Planets','शासक ग्रह (RP)','શાસક ગ્રહ (RP)'],['Event Analysis','घटना विश्लेषण','ઘટના વિશ્લેષણ'],['KP Chart','केपी कुंडली','કેપી કુંડળી'],['Star lord','नक्षत्र स्वामी','નક્ષત્ર સ્વામી'],['Sub lord','उप स्वामी (Sub)','ઉપ સ્વામી (Sub)'],['Sub-sub lord','उप-उप स्वामी','ઉપ-ઉપ સ્વામી'],['Cusp','भाव-संधि','ભાવ-સંધિ'],['Apply KP settings','केपी सेटिंग लागू करें','કેપી સેટિંગ લાગુ કરો'],['Day lord','वार स्वामी','વાર સ્વામી']]);
 function kpLords(lon){
@@ -3504,9 +3824,9 @@ function vSens(){
   <div class="card"><div style="overflow-x:auto"><table><tr><th>Shift</th><th>Time</th><th>Lagna</th><th>D9 Lagna</th><th>D10 Lagna</th><th>Moon</th><th>Dasha at birth</th></tr>${rows.join('')}</table></div></div>`;
 }
 function vLab(){
-  const sub=V.lb||'work',subs=[['work','Workspace'],['panch','Panchanga'],['sens','Birth-time Sensitivity'],['milan','Ashtakoot Milan']];
+  const sub=V.lb||'work',subs=[['work','Workspace'],['panch','Panchanga'],['sens','Birth-time Sensitivity'],['milan','Ashtakoot Milan'],['sbc','Sarvatobhadra Chakra']];
   const bar=`<div class="card" style="padding:8px 14px"><div class="row"><b style="color:var(--acc)">Astro Lab</b><span class="mute">›</span>${subs.map(([k,l])=>`<button class="${sub===k?'on':''}" onclick="V.lb='${k}';render()">${l}</button>`).join('')}</div></div>`;
-  return bar+(sub==='work'?vWork():sub==='panch'?vPanch():sub==='milan'?vMilan():vSens());
+  return bar+(sub==='work'?vWork():sub==='panch'?vPanch():sub==='milan'?vMilan():sub==='sbc'?vSBC():vSens());
 }
 /* ============ RESEARCH menu ============ */
 function vEvents(){
