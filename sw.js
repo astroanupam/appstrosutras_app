@@ -2,7 +2,7 @@
    App files are cached on first visit; the planet-position library (from jsDelivr)
    is cached the first time it loads, so the app works offline afterwards.
    Bump CACHE when you publish a new version so users receive the update. */
-const CACHE = 'appstrosutras-v52';
+const CACHE = 'appstrosutras-v53';
 const SHELL = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png', './apple-touch-icon.png'];
 
 self.addEventListener('install', e => {
