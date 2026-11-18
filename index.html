@@ -8521,14 +8521,32 @@ addTr([['Select a chart','कुंडली चुनें','કુંડળ�
 const cpSorted=()=>S.charts.slice().sort((a,b)=>a.name.localeCompare(b.name,undefined,{sensitivity:'base'}));
 const cpLetter=n=>{const c=(n||'').trim().charAt(0).toUpperCase();return /[A-Z]/.test(c)?c:'#'};
 function cpList(){const q=(V.q||'').trim().toLowerCase(),az=V.az||'';return cpSorted().filter(c=>(!q||c.name.toLowerCase().includes(q))&&(!az||cpLetter(c.name)===az))}
+/* ---- paging for long lists (10 / 20 / 50 / 100 per page, page numbers, previous / next) ---- */
+addTr([['per page','प्रति पृष्ठ','પ્રતિ પાનું'],['Showing','दिखा रहे हैं','બતાવી રહ્યા છીએ'],['of','में से','માંથી'],['Previous','पिछला','પાછળ'],['Next','अगला','આગળ'],['First','पहला','પહેલું'],['Last','अंतिम','છેલ્લું'],['Page','पृष्ठ','પાનું'],['Go to page','पृष्ठ पर जाएँ','પાના પર જાઓ'],['Go','जाएँ','જાઓ']]);
+const PG_SIZES=[10,20,50,100];
+function pgSize(){const n=+((S.ui&&S.ui.pgSize)||20);return PG_SIZES.includes(n)?n:20}
+function pgSetSize(n){S.ui=S.ui||{};S.ui.pgSize=+n;save();V.cpPage=1;V.libPage=1;render()}
+function pgPages(total){return Math.max(1,Math.ceil(total/pgSize()))}
+function pgClamp(total,p){return Math.min(pgPages(total),Math.max(1,+p||1))}
+function pgGo(key,p,total){V[key+'Page']=pgClamp(total,p);if(key==='cp'){const r=document.getElementById('cp_res');if(r){r.innerHTML=cpResultsHTML();applyLang(r)}else render()}else render()}
+function pgBar(key,total,page,pos){const n=pgPages(total),sz=pgSize(),a=(page-1)*sz+1,b=Math.min(total,page*sz);
+  const sel=`<label style="margin:0;display:inline-flex;gap:6px;align-items:center;font-size:13px"><select onchange="pgSetSize(this.value)" style="width:auto">${PG_SIZES.map(x=>`<option value="${x}"${x===sz?' selected':''}>${x}</option>`).join('')}</select> per page</label>`;
+  const info=`<span class="mute" style="font-size:13px">Showing ${total?a:0}–${b} of ${total}</span>`;
+  if(pos==='top')return `<div class="row" style="gap:10px;align-items:center;margin-bottom:6px">${sel}${info}</div>`;
+  if(n<=1)return '';
+  const nums=[];const add=x=>{if(x>=1&&x<=n&&!nums.includes(x))nums.push(x)};add(1);add(2);for(let i=page-2;i<=page+2;i++)add(i);add(n-1);add(n);nums.sort((x,y)=>x-y);
+  let btns='',last=0;nums.forEach(x=>{if(last&&x-last>1)btns+='<span class="mute" style="padding:0 4px">…</span>';btns+=`<button class="sm ${x===page?'on':''}" onclick="pgGo('${key}',${x},${total})">${x}</button>`;last=x});
+  return `<div class="row" style="gap:6px;align-items:center;margin-top:8px;flex-wrap:wrap"><button class="sm" ${page<=1?'disabled':''} onclick="pgGo('${key}',1,${total})">« First</button><button class="sm" ${page<=1?'disabled':''} onclick="pgGo('${key}',${page-1},${total})">‹ Previous</button>${btns}<button class="sm" ${page>=n?'disabled':''} onclick="pgGo('${key}',${page+1},${total})">Next ›</button><button class="sm" ${page>=n?'disabled':''} onclick="pgGo('${key}',${n},${total})">Last »</button>
+   <span class="mute" style="font-size:13px;margin-left:8px">Page ${page} of ${n}</span>${n>7?`<label style="margin:0 0 0 8px;display:inline-flex;gap:4px;align-items:center;font-size:13px">Go to page <input type="number" min="1" max="${n}" style="width:70px" onkeydown="if(event.key==='Enter')pgGo('${key}',this.value,${total})"><button class="sm" onclick="pgGo('${key}',this.previousElementSibling.value,${total})">Go</button></label>`:''}</div>`}
 function cpResultsHTML(){
   const L=cpList();
   if(!L.length)return '<p class="mute">No chart matches your search.</p>';
-  return `<div class="mute" style="margin-bottom:4px">${L.length} / ${S.charts.length} matching</div><table>${L.map(c=>{const C=getC(c);
-    return `<tr${c.id===V.chartId?' style="background:var(--acc2)"':''}><td><b>${esc(c.name)}</b><div class="mute">${esc(c.date)} ${esc(c.time)} · ${esc(c.place)} · ID ${esc(c.cid||'')}</div></td><td>${SIGNS[C.lagna]}<div class="mute">${SIGNS[C.P.Moon.sign]}</div></td><td style="text-align:right;white-space:nowrap">${V.cpCtx==='edit'?`<button class="sm pri" onclick="cpPick('${c.id}')">Edit</button>`:`<button class="sm" onclick="cpPick('${c.id}')">Select</button>${V.cpCtx==='consult'?'':` <button class="sm pri" onclick="go('work','${c.id}')">Open</button>`}`}</td></tr>`}).join('')}</table>`;
+  const page=pgClamp(L.length,V.cpPage),sz=pgSize(),P=L.slice((page-1)*sz,page*sz);V.cpPage=page;
+  return `${pgBar('cp',L.length,page,'top')}<div class="mute" style="margin-bottom:4px">${L.length} / ${S.charts.length} matching</div><table>${P.map(c=>{const C=getC(c);
+    return `<tr${c.id===V.chartId?' style="background:var(--acc2)"':''}><td><b>${esc(c.name)}</b><div class="mute">${esc(c.date)} ${esc(c.time)} · ${esc(c.place)} · ID ${esc(c.cid||'')}</div></td><td>${SIGNS[C.lagna]}<div class="mute">${SIGNS[C.P.Moon.sign]}</div></td><td style="text-align:right;white-space:nowrap">${V.cpCtx==='edit'?`<button class="sm pri" onclick="cpPick('${c.id}')">Edit</button>`:`<button class="sm" onclick="cpPick('${c.id}')">Select</button>${V.cpCtx==='consult'?'':` <button class="sm pri" onclick="go('work','${c.id}')">Open</button>`}`}</td></tr>`}).join('')}</table>${pgBar('cp',L.length,page,'bottom')}`;
 }
-function cpQ(v){V.q=v;const r=document.getElementById('cp_res');if(r){r.innerHTML=cpResultsHTML();applyLang(r)}}
-function cpAz(L){V.az=(V.az===L||L==='')?'':L;render()}
+function cpQ(v){V.q=v;V.cpPage=1;const r=document.getElementById('cp_res');if(r){r.innerHTML=cpResultsHTML();applyLang(r)}}
+function cpAz(L){V.az=(V.az===L||L==='')?'':L;V.cpPage=1;render()}
 function cpPick(id){if(!id)return;V.chartId=id;if(V.cpCtx==='edit'){V.editId=id;V.editFresh=1;V.editMsg=''}render()}
 function chartPicker(){
   const all=cpSorted(),letters=new Set(all.map(c=>cpLetter(c.name))),sel=S.charts.find(c=>c.id===V.chartId);
@@ -8838,14 +8856,14 @@ function vBirth(){
 function go(v,id){V.view=v; if(v==='work'&&id)V.chartId=id; render(); scrollTo(0,0);}
 
 function vCharts(){
-  const rows=S.charts.map(c=>{const C=getC(c);return `<tr><td><b>${esc(c.name)}</b><div class="mute">${esc(c.date)} ${esc(c.time)} · ${esc(c.place)}</div></td>
+  const total=S.charts.length,page=pgClamp(total,V.libPage),sz=pgSize();V.libPage=page;
+  const rows=S.charts.slice((page-1)*sz,page*sz).map(c=>{const C=getC(c);return `<tr><td><b>${esc(c.name)}</b><div class="mute">${esc(c.date)} ${esc(c.time)} · ${esc(c.place)}</div></td>
    <td>${SIGNS[C.lagna]}</td><td>${SIGNS[C.P.Moon.sign]}<div class="mute">${NAKS[C.P.Moon.nak]}</div></td>
    <td><button class="sm pri" onclick="go('work','${c.id}')">Open</button> <button class="sm danger" onclick="delChart('${c.id}')">Delete</button></td></tr>`}).join('');
-  return `<div class="card"><h2>Horoscope library (${S.charts.length})</h2>
-   <table><tr><th>Name / birth</th><th>Lagna</th><th>Moon</th><th></th></tr>${rows||'<tr><td colspan=4 class="mute">No horoscopes yet.</td></tr>'}</table></div>
+  return `<div class="card"><h2>Horoscope library (${total})</h2>${pgBar('lib',total,page,'top')}
+   <table><tr><th>Name / birth</th><th>Lagna</th><th>Moon</th><th></th></tr>${rows||'<tr><td colspan=4 class="mute">No horoscopes yet.</td></tr>'}</table>${pgBar('lib',total,page,'bottom')}</div>
   `;
-}
-const HS=[['whole','Whole Sign (Rashi = House)'],['equal','Equal Bhava (Lagna degree at middle of house 1)'],['equalstart','Equal House (Lagna degree at start of house 1)']];
+}const HS=[['whole','Whole Sign (Rashi = House)'],['equal','Equal Bhava (Lagna degree at middle of house 1)'],['equalstart','Equal House (Lagna degree at start of house 1)']];
 const fl=x=>SABBR[Math.floor(norm(x)/30)]+' '+dm(norm(x)%30);
 function drawBhava(C){const it=Array.from({length:12},()=>[]);it[C.lagna].push('As');for(const n of PLANETS){const p=C.P[n];it[(C.lagna+p.house-1)%12].push(AB[n]+(p.retro&&n!=='Rahu'&&n!=='Ketu'?'ʳ':''))}return northSVG(it,C.lagna,'Bhava Chalit')}
 function cuspRows(C){let s='';for(let h=1;h<=12;h++){const a=C.ascLon+30*(h-1);let st,mid,en;if(C.hs==='equalstart'){st=a;mid=a+15;en=a+30}else{st=a-15;mid=a;en=a+15}s+=`<tr><td>${h}</td><td>${fl(st)}</td><td>${fl(mid)}</td><td>${fl(en)}</td><td>${C.lord(h)}</td></tr>`}return s}
