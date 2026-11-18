@@ -7244,10 +7244,10 @@ function bdParseDate(s){const m=String(s).trim().match(/^(\d{1,2})[\/\-.](\d{1,2
 function bdTime(){let h=parseInt(n_h.value),m=parseInt(n_m.value),s=parseInt(n_s.value);if(isNaN(m))m=isNaN(h)?NaN:0;if(isNaN(s))s=0;if(isNaN(h)||isNaN(m))return null;
   if(bdMode===12){if(h<1||h>12)return null;h=(h%12)+(n_ampm.value==='PM'?12:0)}else if(h<0||h>23)return null;if(m<0||m>59||s<0||s>59)return null;return {h,m,s}}
 /* ---- form ---- */
-function vNew(){bdInit();
+function vNew(ed){bdInit();const ec=ed?S.charts.find(x=>x.id===V.editId):null;
   const lb=(t,x)=>`<label class="bdl">${t}</label>${x}`;
   return `<style>.bdx{display:flex;flex-direction:column;gap:12px;max-width:760px}.bdx .bdc{border-radius:14px;padding:16px 18px}.bdx h3{margin:0 0 6px;font-size:17px}.bdx .bdl{display:block;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--mute);margin:12px 0 4px}.bdx input[type=text],.bdx input[type=number],.bdx select,.bdx textarea{width:100%;box-sizing:border-box;border-radius:10px;background:var(--acc2)}.bdx .bdr{display:flex;gap:10px;flex-wrap:wrap}.bdx .bdr>div{flex:1;min-width:110px}.bdx .bdh{font-size:12px;color:var(--mute);margin:6px 0 0;line-height:1.5}.bdx .bdseg button{padding:7px 16px;border-radius:10px;margin-right:8px}.bdx .bdseg button.on{border:1px solid var(--acc);color:var(--acc);font-weight:700}.bdx .bdchk{display:flex;align-items:center;gap:8px;margin-top:10px;font-size:14px;color:var(--ink)}.bdx .bdchk input{width:auto}</style>
-  <div class="bdx"><p class="mute" style="margin:0">Enter birth data. The time zone is looked up for the birth date from the place; tick “Use manual offset” to enter the zone and daylight saving yourself (for example local mean time).</p>
+  <div class="bdx">${ec?`<div class="card" style="background:var(--acc2);border-radius:14px"><b>Editing: ${esc(ec.name)}</b> <span class="mute">· the form shows the data saved with this chart; change anything and press “Save changes”. Nothing is changed until you confirm.</span></div>`:`<p class="mute" style="margin:0">Enter birth data. The time zone is looked up for the birth date from the place; tick “Use manual offset” to enter the zone and daylight saving yourself (for example local mean time).</p>`}
   <div class="card bdc"><h3>Birth details</h3>
    ${lb('Name of native','<input type="text" id="n_name" placeholder="e.g. Case 014">')}
    <div class="bdr"><div>${lb('Gender (optional)','<select id="n_gender"><option value="">—</option><option>Male</option><option>Female</option><option>Other</option></select>')}</div><div>${lb('Rating of the birth time','<select id="n_rating">'+BD_RATINGS.map(r=>`<option value="${r[0]}">${r[1]}</option>`).join('')+'</select>')}</div></div>
@@ -7263,7 +7263,7 @@ function vNew(){bdInit();
    <div class="bdr"><div>${lb('Latitude (N +, S −)','<input type="text" id="n_lat" onchange="prevUTC()">')}</div><div>${lb('Longitude (E +, W −)','<input type="text" id="n_lon" onchange="prevUTC()">')}</div></div>
    ${lb('Time zone (IANA)','<input type="text" id="n_iana" value="Asia/Kolkata" list="n_zones" onchange="prevUTC()"><datalist id="n_zones"></datalist>')}
    <p class="bdh">Example: Asia/Kolkata. The historical offset for the birth date is looked up automatically.</p>
-   <div class="bdchk"><input type="checkbox" id="n_def" onchange="defToggle()"><label for="n_def" style="margin:0;display:inline;font-size:14px;color:var(--ink)">Keep this place as the default place for new charts</label><span id="n_defnote" class="mute"></span></div>
+   ${ed?'':'<div class="bdchk"><input type="checkbox" id="n_def" onchange="defToggle()"><label for="n_def" style="margin:0;display:inline;font-size:14px;color:var(--ink)">Keep this place as the default place for new charts</label><span id="n_defnote" class="mute"></span></div>'}
   </div>
   <div class="card bdc"><h3>Time zone and DST</h3>
    <p id="n_tzline" style="margin:0;font-size:14px">Enter the date, time and place to see the offset used for that birth date.</p>
@@ -7278,7 +7278,33 @@ function vNew(){bdInit();
    ${lb('If Custom: ayanamsa at year 2000 (degrees)','<input type="text" id="n_ayc" placeholder="e.g. 23.85">')}
    <div class="bdr"><div>${lb('Rahu / Ketu','<select id="n_node"><option value="mean">Mean node</option><option value="true">True node</option></select>')}</div><div>${lb('House system','<select id="n_hs">'+HS.map(([v,l])=>`<option value="${v}">${l}</option>`).join('')+'</select>')}</div></div>
    <p class="bdh">Settings are saved with each chart.</p></div>
-  <div class="card bdc">${lb('Personal research notes','<textarea id="n_notes" rows="3" placeholder="Source of the data, reliability of the birth time"></textarea>')}<div style="margin-top:12px"><button class="pri" onclick="addChart()">Cast &amp; save chart</button></div></div></div>`}
+  <div class="card bdc">${lb('Personal research notes','<textarea id="n_notes" rows="3" placeholder="Source of the data, reliability of the birth time"></textarea>')}<div style="margin-top:12px">${ed?'<button class="pri" onclick="bdSaveEdit()">Save changes</button> <button onclick="bdEditCancel()">Cancel</button>':'<button class="pri" onclick="addChart()">Cast &amp; save chart</button>'}</div></div></div>`}
+/* ---- Edit a chart (Birth Details › Edit a Chart) ---- */
+function vEditChart(){const c=S.charts.find(x=>x.id===V.editId),msg=V.editMsg?`<div class="card" style="background:var(--bg-ok,#e7f4e4);border:1px solid var(--ok,#2e7d32);border-radius:12px"><b>${V.editMsg}</b></div>`:'';
+  if(!S.charts.length)return '<div class="card">No saved horoscope to edit yet. Create one under “New Chart”.</div>';
+  return msg+chartPicker()+(c?vNew(true):`<div class="card"><p class="mute" style="margin:0">Choose a horoscope above (search, A–Z letters, the list, or the table) and press <b>Edit</b>. The form then opens with all its saved details.</p></div>`)}
+function bdEditInit(){const c=S.charts.find(x=>x.id===V.editId);if(!c||!document.getElementById('n_name'))return;bdInit();bdZones();
+  n_name.value=c.name||'';n_gender.value=(c.gender&&c.gender!=='—')?c.gender:'';n_rating.value=c.rating||'';
+  const [y,m,d]=(c.date||'').split('-');n_date.value=d?d+'/'+m+'/'+y:'';const [hh,mm]=(c.time||'').split(':');bdMode=24;n_h.value=+hh;n_m.value=+mm;n_s.value=c.sec||0;
+  if(c.country){n_country.value=c.country;bdCountry();if(c.state){const o=[...n_state.options].find(x=>x.text===c.state);if(o){n_state.value=o.value;bdFillCities()}}}
+  n_place.value=c.place||'';n_lat.value=c.lat;n_lon.value=c.lon;n_iana.value=c.iana||'';
+  n_ay.value=c.ay||'lahiri';n_ayc.value=(c.ayCustom!==undefined&&!isNaN(c.ayCustom))?c.ayCustom:'';n_node.value=c.node||'mean';n_hs.value=c.hs||'whole';n_notes.value=c.notes||'';
+  n_tz.value=c.tz;n_tzsel.value='custom';n_dstOn.value=c.dst?'1':'0';if(c.dst)n_dst.value=String(c.dst);
+  let auto=false;if(c.iana&&bdZoneOk(c.iana)){try{const dt=bdParseDate(n_date.value),tm=bdTime();if(dt&&tm){const tot=bdOffFor(c.iana,dt.y,dt.mo,dt.d,tm.h,tm.m,tm.s);auto=Math.abs(tot-(c.tz+(c.dst||0)))<1e-6}}catch(e){}}
+  n_man.checked=!auto;n_manbox.style.display=auto?'none':'block';prevUTC();
+  if(!auto&&c.iana){document.getElementById('n_tzline').innerHTML='The offset saved with this chart ('+bdHHMM(c.tz+(c.dst||0))+') is different from the browser\'s lookup for '+esc(c.iana)+'; the saved offset is kept (manual).'}
+  else if(!auto){document.getElementById('n_tzline').innerHTML='This chart was saved with a manual offset ('+bdHHMM(c.tz+(c.dst||0))+(c.dst?', including '+c.dst+' h daylight saving':'')+'). Choose a country and city to look it up automatically, or keep the manual offset.'}}
+function bdEditCancel(){V.editId=null;V.editMsg='';render()}
+function bdChanges(c,v){const L=[],f=(k,l,fm)=>{const a=c[k]===undefined?'':c[k],b=v[k]===undefined?'':v[k],A=fm?fm(a):a,B=fm?fm(b):b;if(String(A)!==String(B))L.push(l+': '+(A===''?'(empty)':A)+' → '+(B===''?'(empty)':B))};
+  f('name','Name');f('gender','Gender');f('rating','Rating');f('date','Date of birth');f('time','Time');f('sec','Seconds',x=>x||0);f('place','Place');f('lat','Latitude');f('lon','Longitude');f('tz','UTC offset (standard)');f('dst','Daylight saving (h)',x=>x||0);f('ay','Ayanamsha');f('node','Rahu / Ketu');f('hs','House system');f('notes','Notes',x=>String(x).slice(0,30));return L}
+function bdSaveEdit(){const c=S.charts.find(x=>x.id===V.editId);if(!c)return;const v=formVals();
+  if(!v.name||!v.date||!v.time||[v.tz,v.lat,v.lon].some(isNaN)){alert('Please fill name, date of birth (DD/MM/YYYY), time (hours and minutes), latitude, longitude and the time zone.');return}
+  if(v.ay==='custom'&&isNaN(v.ayCustom)){alert('Enter the custom ayanamsa value.');return}
+  const ch=bdChanges(c,v);if(!ch.length){alert('Nothing was changed.');return}
+  if(!confirm('Save the changes to "'+c.name+'"?\n\n'+ch.join('\n')+'\n\nThe horoscope will be recalculated with the new data everywhere in the application. Press OK to save, or Cancel to keep editing.'))return;
+  const nv=Object.assign({},v);if(!nv.sec)delete nv.sec;if(!nv.rating)delete nv.rating;if(!nv.iana||n_man.checked)delete nv.iana;if(!nv.country){delete nv.country;delete nv.state}else if(!nv.state)delete nv.state;
+  ['iana','country','state','sec','rating'].forEach(k=>{if(nv[k]===undefined)delete c[k]});Object.assign(c,nv);
+  try{clearCache()}catch(e){}save();V.chartId=c.id;const t=new Date();V.editMsg='Saved: “'+esc(c.name)+'” was updated at '+String(t.getHours()).padStart(2,'0')+':'+String(t.getMinutes()).padStart(2,'0')+' ('+ch.length+' change'+(ch.length>1?'s':'')+'). You can open it in Astro Lab or edit another chart.';V.editFresh=1;render();scrollTo(0,0)}
 function bdSetMode(m){bdMode=m;n_b24.className=m===24?'on':'';n_b12.className=m===12?'on':'';n_ampmw.style.display=m===12?'block':'none';n_h.min=m===12?1:0;n_h.max=m===12?12:23;prevUTC()}
 function bdFillCities(){const cc=n_country.value,dl=document.getElementById('n_cities');if(!dl)return;if(!cc){dl.innerHTML='';n_place.placeholder='Select a country first';return}
   const si=n_state.value===''?-2:+n_state.value,L=GEO.p[cc]||[];dl.innerHTML=L.filter(r=>si===-2||r[1]===si).map(r=>`<option value="${esc(r[0])}"></option>`).join('');n_place.placeholder='Type a city or any place'}
@@ -7320,7 +7346,7 @@ function initDefPlace(){bdInit();bdZones();const d=S.ui&&S.ui.defPlace;if(d){n_d
 function defToggle(){const on=n_def.checked,d=S.ui&&S.ui.defPlace;if(on){if(d){fillDefPlace();setPlaceLock(true)}}else{setPlaceLock(false);if(d){n_place.value='';n_lat.value='';n_lon.value='';n_country.value='';bdCountry();n_place.focus()}}defNote();prevUTC()}
 function pickCity(){}
 /* Hindi and Gujarati labels */
-addTr([['Birth details','जन्म विवरण','જન્મ વિગતો'],['Name of native','जातक का नाम','જાતકનું નામ'],['Gender (optional)','लिंग (वैकल्पिक)','જાતિ (વૈકલ્પિક)'],['Rating of the birth time','जन्म समय की विश्वसनीयता','જન્મ સમયની વિશ્વસનીયતા'],['Date of birth (DD/MM/YYYY)','जन्म तिथि (दि/मा/वर्ष)','જન્મ તારીખ (દિ/મા/વર્ષ)'],['24-hour','24 घंटे','24 કલાક'],['12-hour','12 घंटे','12 કલાક'],['Hours','घंटे','કલાક'],['Minutes','मिनट','મિનિટ'],['Seconds','सेकंड','સેકન્ડ'],['Place of birth','जन्म स्थान','જન્મ સ્થળ'],['Country','देश','દેશ'],['State / province','राज्य / प्रांत','રાજ્ય / પ્રાંત'],['City','शहर','શહેર'],['Time zone (IANA)','समय क्षेत्र (IANA)','સમય ક્ષેત્ર (IANA)'],['Time zone and DST','समय क्षेत्र और DST','સમય ક્ષેત્ર અને DST'],['Use manual offset','मैन्युअल ऑफ़सेट उपयोग करें','મેન્યુઅલ ઓફસેટ વાપરો'],['Astrological settings','ज्योतिषीय सेटिंग','જ્યોતિષીય સેટિંગ'],['Ayanamsha','अयनांश','અયનાંશ'],['Personal research notes','व्यक्तिगत शोध टिप्पणियाँ','અંગત સંશોધન નોંધો'],['Cast & save chart','कुंडली बनाएँ और सहेजें','કુંડળી બનાવો અને સાચવો'],['Settings are saved with each chart.','सेटिंग हर कुंडली के साथ सहेजी जाती हैं।','સેટિંગ દરેક કુંડળી સાથે સચવાય છે.'],['Select country','देश चुनें','દેશ પસંદ કરો'],['All states / provinces','सभी राज्य / प्रांत','બધાં રાજ્ય / પ્રાંત'],['Not rated','अंकित नहीं','રેટિંગ નથી']]);
+addTr([['Edit a Chart','कुंडली संपादित करें','કુંડળી સંપાદિત કરો'],['Save changes','बदलाव सहेजें','ફેરફાર સાચવો'],['Birth details','जन्म विवरण','જન્મ વિગતો'],['Name of native','जातक का नाम','જાતકનું નામ'],['Gender (optional)','लिंग (वैकल्पिक)','જાતિ (વૈકલ્પિક)'],['Rating of the birth time','जन्म समय की विश्वसनीयता','જન્મ સમયની વિશ્વસનીયતા'],['Date of birth (DD/MM/YYYY)','जन्म तिथि (दि/मा/वर्ष)','જન્મ તારીખ (દિ/મા/વર્ષ)'],['24-hour','24 घंटे','24 કલાક'],['12-hour','12 घंटे','12 કલાક'],['Hours','घंटे','કલાક'],['Minutes','मिनट','મિનિટ'],['Seconds','सेकंड','સેકન્ડ'],['Place of birth','जन्म स्थान','જન્મ સ્થળ'],['Country','देश','દેશ'],['State / province','राज्य / प्रांत','રાજ્ય / પ્રાંત'],['City','शहर','શહેર'],['Time zone (IANA)','समय क्षेत्र (IANA)','સમય ક્ષેત્ર (IANA)'],['Time zone and DST','समय क्षेत्र और DST','સમય ક્ષેત્ર અને DST'],['Use manual offset','मैन्युअल ऑफ़सेट उपयोग करें','મેન્યુઅલ ઓફસેટ વાપરો'],['Astrological settings','ज्योतिषीय सेटिंग','જ્યોતિષીય સેટિંગ'],['Ayanamsha','अयनांश','અયનાંશ'],['Personal research notes','व्यक्तिगत शोध टिप्पणियाँ','અંગત સંશોધન નોંધો'],['Cast & save chart','कुंडली बनाएँ और सहेजें','કુંડળી બનાવો અને સાચવો'],['Settings are saved with each chart.','सेटिंग हर कुंडली के साथ सहेजी जाती हैं।','સેટિંગ દરેક કુંડળી સાથે સચવાય છે.'],['Select country','देश चुनें','દેશ પસંદ કરો'],['All states / provinces','सभी राज्य / प्रांत','બધાં રાજ્ય / પ્રાંત'],['Not rated','अंकित नहीं','રેટિંગ નથી']]);
 /* ============ EPHEMERIS TOOL › PLANETARY ASPECT MATRIX ============
    Longitudes come from the application's own engine through ephLon (tropLon / nodeTrop / ayanOf). The search service (aspSearch) takes a
    longitude function as input, so it is independent of the user interface and can be reused by other modules and tested with synthetic motion. */
@@ -8499,16 +8525,16 @@ function cpResultsHTML(){
   const L=cpList();
   if(!L.length)return '<p class="mute">No chart matches your search.</p>';
   return `<div class="mute" style="margin-bottom:4px">${L.length} / ${S.charts.length} matching</div><table>${L.map(c=>{const C=getC(c);
-    return `<tr${c.id===V.chartId?' style="background:var(--acc2)"':''}><td><b>${esc(c.name)}</b><div class="mute">${esc(c.date)} ${esc(c.time)} · ${esc(c.place)} · ID ${esc(c.cid||'')}</div></td><td>${SIGNS[C.lagna]}<div class="mute">${SIGNS[C.P.Moon.sign]}</div></td><td style="text-align:right;white-space:nowrap"><button class="sm" onclick="cpPick('${c.id}')">Select</button>${V.cpCtx==='consult'?'':` <button class="sm pri" onclick="go('work','${c.id}')">Open</button>`}</td></tr>`}).join('')}</table>`;
+    return `<tr${c.id===V.chartId?' style="background:var(--acc2)"':''}><td><b>${esc(c.name)}</b><div class="mute">${esc(c.date)} ${esc(c.time)} · ${esc(c.place)} · ID ${esc(c.cid||'')}</div></td><td>${SIGNS[C.lagna]}<div class="mute">${SIGNS[C.P.Moon.sign]}</div></td><td style="text-align:right;white-space:nowrap">${V.cpCtx==='edit'?`<button class="sm pri" onclick="cpPick('${c.id}')">Edit</button>`:`<button class="sm" onclick="cpPick('${c.id}')">Select</button>${V.cpCtx==='consult'?'':` <button class="sm pri" onclick="go('work','${c.id}')">Open</button>`}`}</td></tr>`}).join('')}</table>`;
 }
 function cpQ(v){V.q=v;const r=document.getElementById('cp_res');if(r){r.innerHTML=cpResultsHTML();applyLang(r)}}
 function cpAz(L){V.az=(V.az===L||L==='')?'':L;render()}
-function cpPick(id){if(!id)return;V.chartId=id;render()}
+function cpPick(id){if(!id)return;V.chartId=id;if(V.cpCtx==='edit'){V.editId=id;V.editFresh=1;V.editMsg=''}render()}
 function chartPicker(){
   const all=cpSorted(),letters=new Set(all.map(c=>cpLetter(c.name))),sel=S.charts.find(c=>c.id===V.chartId);
   if(!all.length)return '';
   let selBar='';
-  if(sel&&V.cpCtx!=='consult'){const C=getC(sel);
+  if(sel&&V.cpCtx!=='consult'&&V.cpCtx!=='edit'){const C=getC(sel);
     selBar=`<div style="margin-top:10px;padding:8px;border:1px solid var(--line);border-radius:8px;background:var(--acc2)"><b>Selected:</b> ${esc(sel.name)} <span class="mute">· ${esc(sel.date)} ${esc(sel.time)} · ${SIGNS[C.lagna]} Lagna · ${SIGNS[C.P.Moon.sign]} Moon</span>
      <div class="row" style="margin-top:6px"><button class="sm pri" onclick="go('work','${sel.id}')">Open in Astro Lab</button><button class="sm" onclick="go('charts3')">Charts</button><button class="sm" onclick="go('strength')">Strength</button><button class="sm" onclick="go('dasha')">Dasha</button><button class="sm" onclick="go('transit')">Transit</button></div></div>`}
   return `<div class="card"><h3>Select a chart</h3>
@@ -8798,15 +8824,16 @@ function render(){
   m.innerHTML=V.view==='home'?vHomeWrap():V.view==='birth'?vBirth():V.view==='charts3'?vCharts3():V.view==='strength'?vStrength():V.view==='dasha'?vDasha():V.view==='transit'?vTransit():V.view==='kp'?vKP():V.view==='tajik'?vTajik():V.view==='numer'?vNumMain():V.view==='jaim'?vJaimini():V.view==='horary'?vHorary():V.view==='consult'?vConsult():V.view==='lab'?vLab():V.view==='research'?vResearch():V.view==='eph'?vEphTool():V.view==='about'?vAbout():vHomeWrap();
   document.getElementById('disc').innerHTML=discInner()+' <a href="#" class="noprint" onclick="V.ab=\'disc\';go(\'about\');return false">Read full disclaimer</a>';
   if(V.view==='birth'&&V.bd==='new')initDefPlace();
+  if(V.view==='birth'&&V.bd==='edit')bdEditInit();
   renderCtl(); applyLang();
 }
 function vBirth(){
-  V.cpCtx='';
-  const sub=V.bd||'new';
+  const sub=V.bd||'new';V.cpCtx=sub==='edit'?'edit':'';
   const bar=`<div class="card" style="padding:8px 14px"><div class="row"><b style="color:var(--acc)">Birth Details</b><span class="mute">›</span>
     <button class="${sub==='new'?'on':''}" onclick="V.bd='new';render()">New Chart</button>
-    <button class="${sub==='open'?'on':''}" onclick="V.bd='open';render()">Open a Chart (${S.charts.length})</button></div></div>`;
-  return bar+chartPicker()+(sub==='new'?vNew():vCharts());
+    <button class="${sub==='open'?'on':''}" onclick="V.bd='open';render()">Open a Chart (${S.charts.length})</button>
+    <button class="${sub==='edit'?'on':''}" onclick="V.bd='edit';render()">Edit a Chart</button></div></div>`;
+  return bar+(sub==='edit'?vEditChart():chartPicker()+(sub==='new'?vNew():vCharts()));
 }
 function go(v,id){V.view=v; if(v==='work'&&id)V.chartId=id; render(); scrollTo(0,0);}
 
