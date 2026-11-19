@@ -1763,7 +1763,7 @@ function vAbout(){
 /* ---- login (local privacy lock; accounts are stored only in this browser) ---- */
 const UKEY='appstrosutras_users',SSKEY='appstrosutras_session';
 let L={mode:'in',err:'',user:'',name:'',note:''};
-function uLoad(){let U;try{U=JSON.parse(localStorage.getItem(UKEY))||{}}catch(e){U={}}const ks=Object.keys(U);let ch=false;if(ks.length&&!ks.some(k=>U[k].role==='admin')){const f=ks.slice().sort((a,b)=>(U[a].created||0)-(U[b].created||0))[0];U[f].role='admin';ch=true}ks.forEach(k=>{if(!U[k].role){U[k].role='user';ch=true}});if(ch)try{localStorage.setItem(UKEY,JSON.stringify(U))}catch(e){}return U}
+function uLoad(){let U;try{U=JSON.parse(localStorage.getItem(UKEY))||{}}catch(e){U={}}const ks=Object.keys(U);let ch=false;if(ks.length&&ks.every(k=>!U[k].role)){const f=ks.slice().sort((a,b)=>(U[a].created||0)-(U[b].created||0))[0];U[f].role='admin';ch=true}ks.forEach(k=>{if(!U[k].role){U[k].role='user';ch=true}});if(ch)try{localStorage.setItem(UKEY,JSON.stringify(U))}catch(e){}return U}
 function uSave(u){try{localStorage.setItem(UKEY,JSON.stringify(u))}catch(e){}}
 function rndSalt(){try{return [...crypto.getRandomValues(new Uint8Array(12))].map(x=>x.toString(16).padStart(2,'0')).join('')}catch(e){return String(Math.random()).slice(2)+Date.now()}}
 async function pwHash(pw,salt){
@@ -1778,7 +1778,7 @@ const ROLES=[['admin','Superadmin'],['researcher','Researcher'],['user','User']]
 const AKEY='appstrosutras_authcfg',RB_PERM={researcher:['chart.add','lab.test','lab.config','master.write','thread.use'],user:['chart.add','lab.test']};
 function aCfg(){try{return Object.assign({selfSignup:true},JSON.parse(localStorage.getItem(AKEY))||{})}catch(e){return {selfSignup:true}}}
 function aCfgSave(o){try{localStorage.setItem(AKEY,JSON.stringify(o))}catch(e){}}
-function authCur(){let n=null;try{n=sessionStorage.getItem(SSKEY)||localStorage.getItem(SSKEY)}catch(e){}const U=uLoad();return n&&U[n]&&!U[n].disabled?{id:n,name:U[n].name,role:U[n].role||'user'}:null}
+function authCur(){let n=null;try{n=sessionStorage.getItem(SSKEY)||localStorage.getItem(SSKEY)}catch(e){}const U=uLoad();return n&&U[n]&&!U[n].disabled&&!U[n].pending?{id:n,name:U[n].name,role:U[n].role||'user'}:null}
 const authRole=()=>{const c=authCur();return c?c.role:''};
 const isAdmin=()=>(window.__rbForce||authRole())==='admin';
 /* can('permission'): the Superadmin may do everything; the other levels only what is listed in RB_PERM. A permission not listed (exam.key, ps.settings, ps.promote, questions.add, master.delete, import.data, backup, restore, erase, users.manage …) is Superadmin only. */
@@ -1797,11 +1797,20 @@ function tryFail(k){const a=tryLoad(),o=a[k]||{fails:0,until:0};o.fails++;if(o.f
 function tryClear(k){const a=tryLoad();if(a[k]){delete a[k];trySave(a)}}
 const tryMsg=s=>'Too many wrong attempts. Try again in '+(s>=60?Math.ceil(s/60)+' minute'+(Math.ceil(s/60)>1?'s':''):s+' seconds')+'.';
 function pwOk(pw){return /^(?=.*[A-Za-z])(?=.*\d).{8,}$/.test(pw||'')?'':'Password must be at least 8 characters, with at least one letter and one number.'}
+const SETUP_SALT='4c24623a4311f0a3ee0b404b',SETUP_HASH='pf9556df9f9f3d450bcc3f12011f53ce3984528cd8689844463bd7113cb179b24';
+const ACCOUNT_RULES='AppstroSutras is free software. Logins are provided free of charge, as they are, with no guarantee of access. The developer and the Superadmin may suspend, ban, change the level of, or delete any login at any time, with or without prior notice or reason, and may change or withdraw features. A User account is active at once. A Researcher account starts working only after the Superadmin activates it. Keep your own backup of anything you want to keep.';
+const ACCOUNT_NOTE='Free software: the developer and the Superadmin may suspend, ban or delete any login at any time without prior notice.';
+const hasAdmin=U=>Object.values(U||uLoad()).some(u=>u.role==='admin');
+async function authCheckCode(c){return (await pwHash(rbNorm(c),SETUP_SALT))===SETUP_HASH}
+const lastCat=()=>{try{return localStorage.getItem('appstrosutras_cat')||'user'}catch(e){return 'user'}};
+function authType(v){const g=id=>(document.getElementById(id)||{}).value||'';L.name=g('lg-name');L.user=g('lg-user');L.type=v;L.owner=v==='admin';L.err='';L.mode='up';authRender()}
+function authOwner(on){L.owner=!!on;L.err='';L.mode='up';authRender()}
+function authImportLogins(){const f=document.getElementById('lg-ifile'),p=document.getElementById('lg-ipw');rbImportLogins(f,(p||{}).value||'',true)}
 function authInit(){
   if(authCur()){document.body.classList.remove('locked');document.getElementById('login').hidden=true;lkStart();return}
-  const n=Object.keys(uLoad()).length;L.mode=n?(L.mode==='rec'?'rec':'in'):'up';L.err='';if(!n&&!L.user)L.user='astromate';document.body.classList.add('locked');authRender();
+  const n=Object.keys(uLoad()).length;L.mode=n?(L.mode==='rec'?'rec':'in'):'up';L.err='';document.body.classList.add('locked');authRender();
 }
-function authMode(m){L.mode=m;L.err='';authRender()}
+function authMode(m){L.mode=m;L.err='';L.owner=false;authRender()}
 function authRender(){
   const el=document.getElementById('login');el.hidden=false;const U=uLoad(),first=!Object.keys(U).length,cfg=aCfg(),up=L.mode==='up',rec=L.mode==='rec',rk=L.mode==='rk';
   const brand=`<div translate="no" style="text-align:center"><div class="lbrand">AppstroSutras</div><div class="mute">AppstroSutras by Anoopam Shukla</div></div>`;
@@ -1819,21 +1828,27 @@ function authRender(){
      <label>New password</label><input id="lg-pw" type="password" autocomplete="new-password"><label>Confirm new password</label><input id="lg-pw2" type="password" autocomplete="new-password">
      ${L.err?`<div style="color:var(--bad);margin:6px 0">${L.err}</div>`:''}<button class="pri" type="submit" style="width:100%;margin-top:8px">Reset password</button>
      <div style="text-align:center;margin-top:10px"><a href="#" onclick="authMode('in');return false">Back to sign in</a></div></form>${foot}</div>`;applyLang(el);return}
+  const owner=!!L.owner,showOwner=!hasAdmin(U);
   el.innerHTML=`<div class="lcard">${brand}
-   <div class="row" style="justify-content:center;margin:14px 0 6px">${first?`<b>Set up the Superadmin</b>`:`<button class="${up?'':'on'}" onclick="authMode('in')">Sign in</button>${cfg.selfSignup?`<button class="${up?'on':''}" onclick="authMode('up')">Create account</button>`:''}`}${lang}</div>
-   <p class="mute" style="text-align:center;margin:6px 0 10px">${first?'First start on this device. Create the Superadmin login: it creates and manages every other login (User, Researcher) and sets the questions, rules and backups.':up?'Create your account to begin. It is stored only on this device.':'Welcome back. Sign in to open your workbench.'}</p>
+   <div class="row" style="justify-content:center;margin:14px 0 6px">${owner?`<b>Set up the Superadmin</b>`:first?`<b>Create your login</b>`:`<button class="${up?'':'on'}" onclick="authMode('in')">Sign in</button>${cfg.selfSignup?`<button class="${up?'on':''}" onclick="authMode('up')">Create account</button>`:''}`}${lang}</div>
+   <p class="mute" style="text-align:center;margin:6px 0 10px">${owner?'Owner setup. Type the Setup Code that only the owner knows. The Superadmin creates and manages every other login (User, Researcher) and sets the questions, rules and backups.':first?'First time on this device. Create your login to begin. It is stored only on this device.':up?'Create your account to begin. It is stored only on this device.':'Welcome back. Sign in to open your workbench.'}</p>
    ${L.note?`<p class="warn" style="text-align:center;margin:0 0 8px"><b>${esc(L.note)}</b></p>`:''}
    <form onsubmit="authSubmit(event)" autocomplete="on">
+    ${owner?`<label>Setup Code</label><input id="lg-code" translate="no" autocomplete="off" style="text-transform:uppercase">`:''}
     ${up?`<label>Your full name</label><input id="lg-name" value="${esc(L.name)}" autocomplete="name">`:''}
-    <label>Username</label><input id="lg-user" value="${esc(L.user)}" autocomplete="username" autocapitalize="none">
+    ${up?'':`<label>Sign in as</label><select id="lg-cat">${opt([['user','User'],['researcher','Researcher'],['admin','Superadmin']],L.cat||lastCat())}</select>`}
+    <label>Username</label><input id="lg-user" value="${esc(L.user||(owner?'astromate':''))}" autocomplete="username" autocapitalize="none">
     <label>Password</label><input id="lg-pw" type="password" autocomplete="${up?'new-password':'current-password'}">
     ${up?`<label>Confirm password</label><input id="lg-pw2" type="password" autocomplete="new-password">`:''}
+    ${up?`<label>Account type</label><select id="lg-type" onchange="authType(this.value)">${opt([['user','User - active at once'],['researcher','Researcher - starts after the Superadmin activates it']].concat(hasAdmin(U)?[]:[['admin','Superadmin - owner only, needs the Setup Code']]),owner?'admin':(L.type||'user'))}</select>`:''}
+    ${up&&!owner?`<div class="disc" style="margin:8px 0;text-align:left"><b>Account rules</b><p style="margin:4px 0">${ACCOUNT_RULES}</p><label style="display:flex;gap:6px;align-items:flex-start;margin:4px 0 0"><input id="lg-terms" type="checkbox" ${L.terms?'checked':''} style="width:auto;margin-top:3px"> I have read and accept the account rules</label></div>`:''}
     <div style="margin:8px 0"><label style="display:inline-flex;gap:6px;align-items:center;margin:0 14px 0 0"><input type="checkbox" onchange="['lg-pw','lg-pw2'].forEach(i=>{const e=document.getElementById(i);if(e)e.type=this.checked?'text':'password'})" style="width:auto"> Show password</label>
      <label style="display:inline-flex;gap:6px;align-items:center;margin:0"><input id="lg-keep" type="checkbox" style="width:auto"> Keep me signed in on this device</label></div>
     ${L.err?`<div style="color:var(--bad);margin:6px 0">${L.err}</div>`:''}
-    <button class="pri" type="submit" style="width:100%;margin-top:6px">${up?(first?'Create the Superadmin login':'Create account'):'Sign in'}</button>
-    ${up?'':`<div style="text-align:center;margin-top:10px"><a href="#" onclick="authForgot();return false">Forgot password?</a></div>`}
+    <button class="pri" type="submit" style="width:100%;margin-top:6px">${owner?'Create the Superadmin login':up?'Create account':'Sign in'}</button>
+    ${up?'':`<div style="text-align:center;margin-top:10px"><a href="#" onclick="authForgot();return false">Forgot password?</a></div><p class="mute" style="font-size:12px;margin:10px 0 0;text-align:center">${ACCOUNT_NOTE}</p>`}
    </form>
+   ${owner?`<details style="margin-top:10px"><summary class="mute" style="font-size:13px;cursor:pointer">Or bring my logins from another browser (logins file)</summary><div style="margin-top:6px"><input id="lg-ifile" type="file" accept=".json,application/json"><label style="margin-top:6px">File password</label><input id="lg-ipw" type="password" autocomplete="off"><button class="sm" style="margin-top:6px" type="button" onclick="authImportLogins()">Import my logins</button></div></details><p style="text-align:center;margin:10px 0 0;font-size:13px"><a href="#" onclick="authOwner(false);return false">Back</a></p>`:(showOwner?`<p style="text-align:center;margin:10px 0 0;font-size:13px"><a href="#" onclick="authOwner(true);return false">I am the owner - set up the Superadmin</a></p>`:'')}
    <p class="mute" style="font-size:12px;margin:12px 0 0">Sign-in is a privacy lock for this device. Your charts and rules stay in this browser; what each login may change depends on its level (Superadmin, Researcher or User).</p>${foot}</div>`;
   applyLang(el);
 }
@@ -1849,22 +1864,30 @@ async function authSubmit(ev){
   const un=g('lg-user').trim().toLowerCase(),pw=g('lg-pw'),keep=document.getElementById('lg-keep').checked;
   L.user=un;
   if(L.mode==='up'){
-    const nm=g('lg-name').trim();L.name=nm;
-    const first=!Object.keys(U).length;
-    if(!first&&!aCfg().selfSignup)return bad('New logins are created by the Superadmin.');
+    const nm=g('lg-name').trim();L.name=nm;L.type=(document.getElementById('lg-type')||{}).value||'user';L.terms=!!(document.getElementById('lg-terms')||{}).checked;
+    const first=!Object.keys(U).length,owner=!!L.owner;
+    if(owner){if(hasAdmin(U))return bad('A Superadmin already exists on this device.');{const l=tryLeft('owner');if(l)return bad(tryMsg(l))}if(!await authCheckCode(g('lg-code'))){const o=tryFail('owner');return bad('That Setup Code is not correct.'+(o.fails>=5?' '+tryMsg(tryLeft('owner')):''))}tryClear('owner')}
+    else if(!first&&!aCfg().selfSignup)return bad('New logins are created by the Superadmin.');
     if(!nm||!un)return bad('Please enter your name and a username.');
     if(!/^[a-z0-9._-]{3,30}$/.test(un))return bad('Username: 3–30 letters, numbers, dot, dash or underscore.');
     if(U[un])return bad('That username already exists.');
     {const pm=pwOk(pw);if(pm)return bad(pm)}
     if(pw!==g('lg-pw2'))return bad('The two passwords do not match.');
-    const salt=rndSalt();U[un]={name:nm,salt,hash:await pwHash(pw,salt),created:Date.now(),role:first?'admin':'user'};uSave(U);
-    if(first){L.rk=await rbSetKey(un);L.rkUser=un;L.rkKeep=keep;L.mode='rk';authRender();return}
+    const ty=(document.getElementById('lg-type')||{}).value==='researcher'?'researcher':'user';
+    if(!owner&&!(document.getElementById('lg-terms')||{}).checked)return bad('Please tick that you accept the account rules.');
+    const salt=rndSalt();U[un]={name:nm,salt,hash:await pwHash(pw,salt),created:Date.now(),role:owner?'admin':ty};if(!owner&&ty==='researcher')U[un].pending=true;uSave(U);
+    if(U[un].pending){L={mode:'in',err:'',user:un,name:'',note:'Your Researcher account has been created. It starts working once the Superadmin activates it.',owner:false};authRender();return}
+    if(owner){L.rk=await rbSetKey(un);L.rkUser=un;L.rkKeep=keep;L.mode='rk';authRender();return}
     authStart(un,keep);
   }else{
+    L.cat=(document.getElementById('lg-cat')||{}).value||L.cat||'user';
     {const l=tryLeft('u:'+un);if(l)return bad(tryMsg(l))}
     const u=U[un];
     if(!u||u.hash!==await pwHash(pw,u.salt)){const o=tryFail('u:'+un);L.err='Incorrect username or password.'+(o.fails>=5?' '+tryMsg(tryLeft('u:'+un)):' ('+(5-o.fails)+(5-o.fails===1?' try left)':' tries left)'));authRender();return}
     tryClear('u:'+un);
+    if(u.role!==L.cat){const nm2=(ROLES.find(r=>r[0]===u.role)||[0,u.role])[1];L.cat=u.role;return bad('This login is a '+nm2+' account. It is now selected in \u201cSign in as\u201d - press Sign in again.')}
+    try{localStorage.setItem('appstrosutras_cat',u.role)}catch(e){}
+    if(u.pending)return bad('Your Researcher account is waiting for the Superadmin to activate it.');
     if(u.disabled)return bad('This login is switched off. Ask the Superadmin.');
     authStart(un,keep);
   }
@@ -8431,16 +8454,21 @@ function rbAdmLogins(){
   ${view}
   ${V.rbKey?`<div class="card" style="border:2px solid var(--acc)"><b>Your new Recovery Key – shown once</b><div translate="no" style="font-size:22px;font-weight:700;letter-spacing:2px;margin:8px 0">${esc(V.rbKey)}</div><span class="mute">Write it down and keep it safe. It replaces any earlier key.</span> <button class="pri sm" onclick="V.rbKey='';render()">I have written it down</button></div>`:''}
   ${myRk?'':`<div class="card" style="border:2px solid var(--bad)"><b>No Recovery Key for your login yet.</b> Without one, a forgotten Superadmin password can only be fixed by erasing the logins (charts stay). <button class="pri sm" onclick="rbMakeKey()">Create my Recovery Key</button></div>`}
+  ${(()=>{const pend=ks.filter(k=>U[k].pending);return pend.length?`<div class="card" style="border:2px solid var(--acc)"><h3 style="margin:0 0 6px">Waiting for your approval (${pend.length})</h3><p class="mute" style="font-size:13px;margin:0 0 6px">These people asked for a Researcher account. They cannot sign in until you approve. Reject removes the request.</p><table style="font-size:13px"><tr><th>Username</th><th>Name</th><th>Asked for</th><th>Registered</th><th></th></tr>${pend.map(k=>`<tr><td translate="no"><b>${esc(k)}</b></td><td>${esc(U[k].name)}</td><td>Researcher</td><td>${rbTime(U[k].created)}</td><td style="white-space:nowrap"><button class="pri sm" data-u="${esc(k)}" onclick="rbApprove(this.dataset.u)">Approve</button> <button class="sm danger" data-u="${esc(k)}" onclick="rbReject(this.dataset.u)">Reject</button></td></tr>`).join('')}</table></div>`:''})()}
   <div class="card"><h3 style="margin:0 0 6px">Logins</h3>
    <table style="font-size:13px"><tr><th>Username</th><th>Name</th><th>Level</th><th>Status</th><th>Last sign-in</th><th>Charts · sheets · threads · attempts</th><th></th></tr>
    ${ks.map(k=>{const u=U[k],n=cnt(k),self=k===me;return `<tr><td translate="no"><b>${esc(k)}</b>${self?' <span class="tag">you</span>':''}</td><td>${esc(u.name)}</td>
-    <td><select data-u="${esc(k)}" onchange="rbSetRole(this.dataset.u,this.value)">${opt(ROLES.map(r=>[r[0],r[1]]),u.role)}</select></td><td>${u.disabled?'<span class="bad">switched off</span>':'active'}</td><td>${rbTime(u.lastIn)}</td><td>${n.charts} · ${n.sheets} · ${n.threads} · ${n.att}</td>
+    <td><select data-u="${esc(k)}" onchange="rbSetRole(this.dataset.u,this.value)">${opt(ROLES.map(r=>[r[0],r[1]]),u.role)}</select></td><td>${u.pending?'<span class="bad">waiting for approval</span>':u.disabled?'<span class="bad">switched off</span>':'active'}</td><td>${rbTime(u.lastIn)}</td><td>${n.charts} · ${n.sheets} · ${n.threads} · ${n.att}</td>
     <td style="white-space:nowrap"><input type="password" id="rbpw_${esc(k)}" placeholder="new password" autocomplete="new-password" style="width:120px"> <button class="sm" data-u="${esc(k)}" onclick="rbResetPw(this.dataset.u)">Set password</button>
      <button class="sm" data-u="${esc(k)}" onclick="rbToggle(this.dataset.u)" ${self?'disabled':''}>${u.disabled?'Switch on':'Switch off'}</button><button class="sm" data-u="${esc(k)}" onclick="rbView(this.dataset.u)">View sheets</button>${self?'':` <button class="sm danger" data-u="${esc(k)}" onclick="rbDelUser(this.dataset.u)">Delete</button>`}</td></tr>`}).join('')}</table>
+   <p class="mute" style="font-size:12px;margin:6px 0 0">Switch off bans a login; Delete removes it. Both can be done at any time, without notice.</p>
    <h3 style="margin:14px 0 6px">Create a login</h3>
    <div class="row" style="gap:8px;align-items:flex-end"><label style="margin:0">Full name<br><input id="rbn_name"></label><label style="margin:0">Username<br><input id="rbn_user" autocapitalize="none"></label><label style="margin:0">Temporary password<br><input id="rbn_pw" type="password" autocomplete="new-password"></label><label style="margin:0">Level<br><select id="rbn_role">${opt(ROLES.filter(r=>r[0]!=='admin').map(r=>[r[0],r[1]]).concat([['admin','Superadmin']]),'user')}</select></label><button class="pri" onclick="rbCreateUser()">Create login</button></div>
-   <label style="display:inline-flex;gap:6px;align-items:center;margin:10px 0 0"><input type="checkbox" style="width:auto" ${cfg.selfSignup?'checked':''} onchange="rbSelfSignup(this.checked)"> Allow people to create their own login on the sign-in screen (as User). Off by default: only you create logins.</label>
+   <label style="display:inline-flex;gap:6px;align-items:center;margin:10px 0 0"><input type="checkbox" style="width:auto" ${cfg.selfSignup?'checked':''} onchange="rbSelfSignup(this.checked)"> Allow people to create their own login on the sign-in screen (as User)</label>
   </div>
+  <div class="card"><h3 style="margin:0 0 6px">Logins file - move my logins to another browser</h3><p class="mute" style="font-size:13px;margin:0 0 6px">A protected file with every login and its level (passwords stay as hashes). Import it in your other browser on the owner setup screen, or here while signed in as Superadmin. Charts and research move with the Backup file, not with this one.</p>
+   <div class="row" style="gap:8px;align-items:flex-end"><label style="margin:0">File password<br><input id="rbx_pw" type="password" autocomplete="new-password"></label><button class="sm" onclick="rbExportLogins()">Export logins file</button></div>
+   <div class="row" style="gap:8px;align-items:flex-end;margin-top:8px"><label style="margin:0">Logins file<br><input id="rbi_f" type="file" accept=".json,application/json"></label><label style="margin:0">File password<br><input id="rbi_pw" type="password" autocomplete="off"></label><button class="sm" onclick="rbImportLogins(document.getElementById('rbi_f'),document.getElementById('rbi_pw').value,false)">Import logins file</button></div></div>
   <div class="card"><h3 style="margin:0 0 6px">All practice-examination attempts</h3>${att.length?`<table style="font-size:12px"><tr><th>Attempt</th><th>Login ID</th><th>Chart</th><th>Score</th><th>Submitted</th><th></th></tr>${att.map(a=>`<tr><td>${esc(a.id)}</td><td translate="no">${esc((a.login||{}).id||'')}</td><td>${esc((a.chart||{}).name||'')}</td><td>${a.score} of ${a.max}</td><td>${rbTime(a.at)}</td><td><button class="sm" data-a="${esc(a.id)}" onclick="V.cxt_ps='qm';V.qmSub='exam';V.chartId=((psQxAtt(this.dataset.a)||{}).chart||{}).id||V.chartId;V.qxView=this.dataset.a;go('predict')">Open</button></td></tr>`).join('')}</table>`:'<p class="mute" style="margin:0">None yet.</p>'}</div>
   <div class="card"><h3 style="margin:0 0 6px">What each level can do</h3>${ROLES.map(r=>`<p style="margin:6px 0 2px"><b>${r[1]}</b></p><div style="font-size:13px"><b>Can:</b><ul style="margin:2px 0 4px 18px">${RB_ABOUT[r[0]].can.map(x=>'<li>'+esc(x)+'</li>').join('')}</ul>${RB_ABOUT[r[0]].cannot.length?'<b>Cannot:</b><ul style="margin:2px 0 0 18px">'+RB_ABOUT[r[0]].cannot.map(x=>'<li>'+esc(x)+'</li>').join('')+'</ul>':''}</div>`).join('')}</div>`}
 function rbView(un){if(!isAdmin())return rbDeny('Viewing other logins');V.psViewAs=un===rbMe()?'':un;V.cxt_ps='ls';go('predict')}
@@ -8493,17 +8521,37 @@ function rbAdmControl(){const U=uLoad(),A=actLoad(),ks=Object.keys(U).sort((a,b)
   const tot={};ks.forEach(k=>{const u=A.users[k];if(!u)return;Object.keys(u.tabs||{}).forEach(v=>{const t=tot[v]=tot[v]||{n:0,secs:0,users:0};t.n+=u.tabs[v].n;t.secs+=u.tabs[v].secs;t.users++})});
   const card=(n,l)=>`<div class="card" style="flex:1;min-width:120px;text-align:center;margin:0"><div style="font-size:26px;font-weight:700;color:var(--acc)">${n}</div><div class="mute" style="font-size:12px">${l}</div></div>`;
   return `<div class="card"><h3 style="margin:0 0 4px">Control panel</h3><p class="mute" style="margin:0;font-size:13px">Counts and times come from sign-ins on <b>this</b> device and browser only. This program keeps no server, so a login that someone creates in their own browser, or on another computer, is not visible here. Time counts only while the page is open and in use (idle for more than 5 minutes is not counted); “signed in now” means active in the last 45 seconds.</p></div>
-  <div class="row" style="gap:8px;margin:0 0 8px">${card(ks.length,'logins registered')}${card(by('admin'),'Superadmin')}${card(by('researcher'),'Researchers')}${card(by('user'),'Users')}${card(off,'switched off')}${card(live.length,'signed in now')}</div>
+  <div class="row" style="gap:8px;margin:0 0 8px">${card(ks.length,'logins registered')}${card(by('admin'),'Superadmin')}${card(by('researcher'),'Researchers')}${card(by('user'),'Users')}${card(off,'switched off')}${card(ks.filter(k=>U[k].pending).length,'waiting for approval')}${card(live.length,'signed in now')}</div>
   <div class="card"><h3 style="margin:0 0 6px">Signed in now</h3>${live.length?`<table style="font-size:13px"><tr><th>Login</th><th>Level</th><th>Signed in since</th><th>Looking at</th></tr>${live.map(s=>`<tr><td translate="no"><b>${esc(s.u)}</b> <span class="mute">${esc(U[s.u].name)}</span></td><td>${esc((ROLES.find(r=>r[0]===U[s.u].role)||[0,''])[1])}</td><td>${rbTime(s.since)}</td><td>${esc(rbViewName(s.view))}</td></tr>`).join('')}</table>`:'<p class="mute" style="margin:0">Nobody is active right now.</p>'}</div>
   <div class="card"><h3 style="margin:0 0 6px">Each login</h3><table style="font-size:13px"><tr><th>Login</th><th>Level</th><th>Registered</th><th>Sign-ins</th><th>Time spent</th><th>Last seen</th><th>Tabs used most (visits · time)</th></tr>
    ${ks.map(k=>{const u=A.users[k]||{logins:0,secs:0,tabs:{}},top=Object.entries(u.tabs||{}).sort((a,b)=>b[1].secs-a[1].secs||b[1].n-a[1].n).slice(0,4).map(([v,t])=>esc(rbViewName(v))+' ('+t.n+' · '+rbDur(t.secs)+')').join('<br>')||'–';return `<tr><td translate="no"><b>${esc(k)}</b>${U[k].disabled?' <span class="bad">off</span>':''}<div class="mute">${esc(U[k].name)}</div></td><td>${esc((ROLES.find(r=>r[0]===U[k].role)||[0,''])[1])}</td><td>${rbTime(U[k].created)}</td><td>${u.logins}</td><td>${rbDur(u.secs)}</td><td>${rbTime(u.last)}</td><td style="font-size:12px">${top}</td></tr>`}).join('')}</table></div>
   <div class="card"><h3 style="margin:0 0 6px">Tabs used by everyone</h3>${Object.keys(tot).length?`<table style="font-size:13px"><tr><th>Tab</th><th>Visits</th><th>Time spent</th><th>Logins using it</th></tr>${Object.entries(tot).sort((a,b)=>b[1].secs-a[1].secs||b[1].n-a[1].n).map(([v,t])=>`<tr><td>${esc(rbViewName(v))}</td><td>${t.n}</td><td>${rbDur(t.secs)}</td><td>${t.users}</td></tr>`).join('')}</table>`:'<p class="mute" style="margin:0">No usage recorded yet.</p>'}
    <div style="margin-top:8px"><button class="sm danger" onclick="rbClearActivity()">Clear the activity record</button></div></div>`}
 function rbClearActivity(){if(!isAdmin())return rbDeny('Clearing the activity record');if(!confirm('Clear the recorded sign-ins, time and tab counts of all logins on this device? The logins themselves stay.'))return;actSave({users:{},sessions:{}});rbMsg('Activity record cleared.')}
-/* ---- every login: own account page ---- */
+/* ---------- logins file: move the Superadmin and other logins to another browser (encrypted with a file password) ---------- */
+const rbHex=/^[0-9a-f]{8,64}$/,rbHash=/^[px][0-9a-f]{5,70}$/;
+function rbCleanUser(un,u){if(!/^[a-z0-9._-]{3,30}$/.test(un)||!u||typeof u!=='object')return null;if(typeof u.salt!=='string'||!rbHex.test(u.salt)||typeof u.hash!=='string'||!rbHash.test(u.hash))return null;
+  const o={name:String(u.name||un).slice(0,80),salt:u.salt,hash:u.hash,created:+u.created||Date.now(),role:ROLES.some(r=>r[0]===u.role)?u.role:'user'};if(u.disabled)o.disabled=true;if(u.pending)o.pending=true;
+  if(u.rk&&typeof u.rk.salt==='string'&&rbHex.test(u.rk.salt)&&typeof u.rk.hash==='string'&&rbHash.test(u.rk.hash))o.rk={salt:u.rk.salt,hash:u.rk.hash};return o}
+async function rbReadLogins(inp,pw){const f=inp&&inp.files&&inp.files[0];if(!f)throw new Error('Choose the logins file first.');if(f.size>1e6)throw new Error('The file is larger than 1 MB.');
+  const txt=await new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(String(r.result));r.onerror=()=>rej(new Error('The file could not be read.'));r.readAsText(f)});let o;try{o=JSON.parse(txt)}catch(e){throw new Error('This is not a logins file.')}
+  if(!o||o.format!=='ASTROSUTRAS-ENC-1')throw new Error('This is not a protected logins file.');if(!pw)throw new Error('Type the file password.');
+  let plain;try{plain=JSON.parse(await bkDecrypt(o,pw))}catch(e){throw new Error('Wrong password, or the file is damaged. Nothing was changed.')}
+  if(!plain||plain.kind!=='logins'||!plain.users)throw new Error('This file does not contain logins.');const out={};Object.keys(plain.users).forEach(k=>{const c=rbCleanUser(k,plain.users[k]);if(c)out[k]=c});if(!Object.keys(out).length)throw new Error('The file has no usable logins.');return out}
+async function rbImportLogins(inp,pw,fromLogin){try{const add=await rbReadLogins(inp,pw),U=uLoad();
+  if(fromLogin){if(hasAdmin(U)){L.err='A Superadmin already exists on this device.';authRender();return}if(!hasAdmin(add)){L.err='This file has no Superadmin login.';authRender();return}}else if(!isAdmin())return rbDeny('Importing logins');
+  let n=0,s=0;Object.keys(add).forEach(k=>{if(U[k])s++;else{U[k]=add[k];n++}});uSave(U);
+  if(fromLogin){L={mode:'in',err:'',user:Object.keys(add).find(k=>add[k].role==='admin')||'',name:'',note:'Logins imported ('+n+'). Sign in with your usual password.',owner:false};authRender();return}
+  rbMsg('Imported '+n+' login(s)'+(s?', '+s+' already present and skipped':'')+'.')}catch(e){if(fromLogin){L.err=e.message;authRender()}else rbMsg(e.message,1)}}
+async function rbExportLogins(){if(!isAdmin())return rbDeny('Exporting logins');const pw=(document.getElementById('rbx_pw')||{}).value||'',pm=pwOk(pw);if(pm)return rbMsg(pm,1);if(!(window.crypto&&crypto.subtle))return rbMsg('Encryption is not available in this browser context.',1);
+  const enc=await bkEncrypt(JSON.stringify({app:'AppstroSutras',kind:'logins',version:1,users:uLoad()}),pw);dl('AppstroSutras-logins-protected.json',enc);rbMsg('Logins file downloaded. Keep its password safe - it cannot be recovered. It holds every login, its level and its password check.')}
+function rbPendingSet(un,on){const U=uLoad();if(!U[un])return false;if(on)U[un].pending=true;else delete U[un].pending;uSave(U);return true}
+function rbApprove(un){if(!isAdmin())return rbDeny('Approving an account');if(rbPendingSet(un,false))rbMsg('“'+un+'” is approved and can sign in as a Researcher now.')}
+function rbReject(un){if(!isAdmin())return rbDeny('Rejecting an account');const U=uLoad();if(!U[un]||!U[un].pending)return;if(!confirm('Reject the request of “'+un+'” and remove the account?'))return;delete U[un];uSave(U);rbMsg('The request of “'+un+'” was rejected and removed.')}/* ---- every login: own account page ---- */
 function vAccount(){const c=authCur();if(!c)return '';const a=RB_ABOUT[c.role]||RB_ABOUT.user,m=V.rbMsg;
   return `<div class="card"><h2 style="margin:0">My account</h2><p style="margin:6px 0"><b>${esc(c.name)}</b> · <span translate="no">${esc(c.id)}</span> · <span class="tag">${esc(rbRoleName())}</span></p></div>
   ${m?`<div class="card ${m.bad?'bad':''}"><b>${esc(m.t)}</b> <button class="sm" onclick="V.rbMsg=null;render()">Close</button></div>`:''}
+  <div class="card"><h3 style="margin:0 0 6px">Account rules</h3><p style="font-size:13px;margin:0">${esc(ACCOUNT_RULES)}</p></div>
   <div class="card"><h3 style="margin:0 0 6px">Change my password</h3><div class="row" style="gap:8px;align-items:flex-end"><label style="margin:0">Current password<br><input id="rbc_old" type="password" autocomplete="current-password"></label><label style="margin:0">New password<br><input id="rbc_new" type="password" autocomplete="new-password"></label><label style="margin:0">Repeat<br><input id="rbc_new2" type="password" autocomplete="new-password"></label><button class="pri" onclick="rbChangePw()">Change password</button></div></div>
   <div class="card"><h3 style="margin:0 0 6px">What my level (${esc(rbRoleName())}) can do</h3><div style="font-size:13px"><b>Can:</b><ul style="margin:2px 0 6px 18px">${a.can.map(x=>'<li>'+esc(x)+'</li>').join('')}</ul>${a.cannot.length?'<b>Cannot:</b><ul style="margin:2px 0 0 18px">'+a.cannot.map(x=>'<li>'+esc(x)+'</li>').join('')+'</ul>':''}</div></div>`}
 async function rbChangePw(){const g=i=>(document.getElementById(i)||{}).value||'',U=uLoad(),me=rbMe(),u=U[me];if(!u)return;
@@ -8516,12 +8564,18 @@ function rbTests(){const R=[],t=cxT(R),saved=window.__rbForce;
    window.__rbForce='user';t('A User is refused the setup permissions (answer key, rules & settings, promote, questions, master delete, imports, backup, restore, erase, user management)','false',all.filter(p=>['exam.key','ps.settings','ps.promote','questions.add','master.delete','import.data','backup','restore','erase','users.manage'].includes(p)).some(p=>can(p)));
    window.__rbForce='';
    const keep=localStorage.getItem(UKEY);
-   try{localStorage.setItem(UKEY,JSON.stringify({a:{name:'A',created:2},b:{name:'B',created:1},c:{name:'C',created:3,role:'researcher'}}));const m2=uLoad();
-    t('Existing logins without a level: the earliest-created becomes Superadmin, the others User; a level that is already set is kept','b:admin,a:user,c:researcher',['b','a','c'].map(k=>k+':'+m2[k].role).join());
+   try{localStorage.setItem(UKEY,JSON.stringify({a:{name:'A',created:2},b:{name:'B',created:1},c:{name:'C',created:3}}));const m2=uLoad();
+    t('Old logins without any level (made before levels existed): the earliest-created becomes Superadmin, the others User','b:admin,a:user,c:user',['b','a','c'].map(k=>k+':'+m2[k].role).join());
     localStorage.setItem(UKEY,JSON.stringify({a:{name:'A',created:1,role:'admin',disabled:true},b:{name:'B',created:2,role:'user'}}));t('A switched-off login cannot be the signed-in login',"true",(()=>{const keepS=sessionStorage.getItem(SSKEY),keepL=localStorage.getItem(SSKEY);try{localStorage.removeItem(SSKEY);sessionStorage.setItem(SSKEY,'a')}catch(e){}const r=authCur()===null;try{if(keepS===null)sessionStorage.removeItem(SSKEY);else sessionStorage.setItem(SSKEY,keepS);if(keepL!==null)localStorage.setItem(SSKEY,keepL)}catch(e){}return r})())}
    finally{if(keep===null)localStorage.removeItem(UKEY);else localStorage.setItem(UKEY,keep)}   t('Password rule: at least 8 characters with a letter and a number','true,false,false,false,true',[pwOk('abc12345')==='',pwOk('abcdefgh')==='',pwOk('12345678')==='',pwOk('abc123')==='',pwOk('Test-pass-1')===''].join());
    try{tryClear('rbtest');tryFail('rbtest');tryFail('rbtest');tryFail('rbtest');tryFail('rbtest');const a=tryLeft('rbtest');tryFail('rbtest');const b=tryLeft('rbtest');tryFail('rbtest');const c2=tryLeft('rbtest');tryClear('rbtest');const d=tryLeft('rbtest');
-    t('Sign-in lockout: four wrong passwords do not lock; the fifth locks for about 1 minute, the sixth for about 2, the seventh for about 4; a correct sign-in clears it','0,true,true,true,0',[a>0?'x':0,b>=50&&b<=61,c2>=110&&c2<=121,(()=>{tryClear('rbtest');for(let i=0;i<7;i++)tryFail('rbtest');const z=tryLeft('rbtest');tryClear('rbtest');return z>=230&&z<=241})(),d].join())}finally{tryClear('rbtest')}   t('A recovery key has 16 characters in 4 groups from an alphabet without look-alike letters, and typing it with spaces or small letters still matches','true,true',[/^([A-HJ-NP-Z2-9]{4}-){3}[A-HJ-NP-Z2-9]{4}$/.test(rbKey()),rbNorm(' ab12-cd34 ')==='AB12CD34'].join());
+    t('Sign-in lockout: four wrong passwords do not lock; the fifth locks for about 1 minute, the sixth for about 2, the seventh for about 4; a correct sign-in clears it','0,true,true,true,0',[a>0?'x':0,b>=50&&b<=61,c2>=110&&c2<=121,(()=>{tryClear('rbtest');for(let i=0;i<7;i++)tryFail('rbtest');const z=tryLeft('rbtest');tryClear('rbtest');return z>=230&&z<=241})(),d].join())}finally{tryClear('rbtest')}   {const keepU=localStorage.getItem(UKEY);try{localStorage.setItem(UKEY,JSON.stringify({a:{name:'A',created:1,role:'user'},b:{name:'B',created:2,role:'user'}}));const m3=uLoad();
+     t('A browser whose logins are all Users is NOT promoted: only a store of old logins without any level makes the earliest one Superadmin','false,false',[hasAdmin(m3),Object.values(m3).some(x=>x.role==='admin')].join())}finally{if(keepU===null)localStorage.removeItem(UKEY);else localStorage.setItem(UKEY,keepU)}}
+   t('The owner Setup Code check is built in as a salted hash, not as the code','true,true',[/^p[0-9a-f]{64}$/.test(SETUP_HASH),SETUP_SALT.length>=16].join());
+   t('A logins file is cleaned: a valid login is kept, a bad username, bad hash or unknown level is refused or reset, text is shortened','true,null,null,user,80',[!!rbCleanUser('ravi',{name:'R',salt:'ab12cd34ef56ab12cd34ef56',hash:'p'+'a'.repeat(64),role:'researcher',created:5}),rbCleanUser('Bad Name',{salt:'ab12cd34ef56',hash:'p'+'a'.repeat(64)}),rbCleanUser('okname',{salt:'zz',hash:'p'+'a'.repeat(64)}),rbCleanUser('okname',{name:'x',salt:'ab12cd34ef56ab12cd34ef56',hash:'p'+'a'.repeat(64),role:'god'}).role,rbCleanUser('okname',{name:'n'.repeat(500),salt:'ab12cd34ef56ab12cd34ef56',hash:'p'+'a'.repeat(64)}).name.length].map(x=>x===null?'null':x).join());   {const keepU=localStorage.getItem(UKEY),keepS=sessionStorage.getItem(SSKEY),keepL=localStorage.getItem(SSKEY);try{localStorage.removeItem(SSKEY);localStorage.setItem(UKEY,JSON.stringify({a:{name:'A',salt:'ab12cd34ef56',hash:'p'+'a'.repeat(64),created:1,role:'admin'},p:{name:'P',salt:'ab12cd34ef56',hash:'p'+'a'.repeat(64),created:2,role:'researcher',pending:true}}));sessionStorage.setItem(SSKEY,'p');const before=authCur();rbPendingSet('p',false);const after=authCur();
+     t('A Researcher account that is waiting for approval cannot be the signed-in login; after approval it can, and keeps the Researcher level','true,true,researcher,true',[before===null,after!==null,after&&after.role,rbPendingSet('nobody',false)===false].join())}finally{if(keepU===null)localStorage.removeItem(UKEY);else localStorage.setItem(UKEY,keepU);if(keepS===null)sessionStorage.removeItem(SSKEY);else sessionStorage.setItem(SSKEY,keepS);if(keepL!==null)localStorage.setItem(SSKEY,keepL)}}
+   t('The account rules say that logins can be suspended, banned or deleted without prior notice, and that a Researcher account needs the Superadmin to activate it','true,true,true',[/without prior notice/.test(ACCOUNT_RULES),/suspend, ban/.test(ACCOUNT_RULES),/Researcher account starts working only after the Superadmin activates it/.test(ACCOUNT_RULES)].join());
+   t('A logins file keeps the waiting-for-approval flag','true',(rbCleanUser('ravi',{name:'R',salt:'ab12cd34ef56ab12cd34ef56',hash:'p'+'a'.repeat(64),role:'researcher',pending:true})||{}).pending===true);   t('A recovery key has 16 characters in 4 groups from an alphabet without look-alike letters, and typing it with spaces or small letters still matches','true,true',[/^([A-HJ-NP-Z2-9]{4}-){3}[A-HJ-NP-Z2-9]{4}$/.test(rbKey()),rbNorm(' ab12-cd34 ')==='AB12CD34'].join());
    t('Items are changed by their owner or the Superadmin only','true,false,true',(()=>{window.__rbForce='user';const me=rbMe();const r=[rbOwns({owner:me})||!me,rbOwns({owner:'someone-else'}),(window.__rbForce='admin',rbOwns({owner:'someone-else'}))];return r.join()})());
    t('Log sheets are kept per login: the Superadmin uses the plain chart key; when looking at another login the key becomes chart@login','c1,c1@bob',(()=>{window.__rbForce='admin';const o=V.psViewAs;V.psViewAs='';const a=rbSheetKey('c1');V.psViewAs='bob';const b2=rbSheetKey('c1');V.psViewAs=o;return a+','+b2})());   t('Sheet key parts are read back','c1,bob,',[rbSheetChart('c1@bob'),rbSheetOwner('c1@bob'),rbSheetOwner('c1')].join());
   }
@@ -8701,6 +8755,62 @@ addTrP([
 [/^The current password is not correct\. Too many wrong attempts\. Try again in (.+)\.$/,`वर्तमान पासवर्ड सही नहीं है। बहुत अधिक गलत प्रयास। $1 बाद फिर कोशिश करें।`,`હાલનો પાસવર્ડ સાચો નથી. ઘણા ખોટા પ્રયાસ. $1 પછી ફરી પ્રયત્ન કરો.`],
 [/^(\d+) minutes?$/,`$1 मिनट`,`$1 મિનિટ`],
 [/^(\d+) seconds$/,`$1 सेकंड`,`$1 સેકન્ડ`]
+]);addTrX([
+[`Create your login`,`अपना लॉगिन बनाएँ`,`તમારું લૉગિન બનાવો`],
+[`First time on this device. Create your login to begin. It is stored only on this device.`,`इस उपकरण पर पहली बार। शुरू करने के लिए अपना लॉगिन बनाएँ। यह केवल इसी उपकरण पर रहता है।`,`આ ઉપકરણ પર પહેલી વાર. શરૂ કરવા માટે તમારું લૉગિન બનાવો. તે ફક્ત આ જ ઉપકરણ પર રહે છે.`],
+[`Owner setup. Type the Setup Code that only the owner knows. The Superadmin creates and manages every other login (User, Researcher) and sets the questions, rules and backups.`,`स्वामी सेटअप। वह सेटअप कोड टाइप करें जो केवल स्वामी जानता है। सुपरएडमिन हर अन्य लॉगिन (यूज़र, शोधकर्ता) बनाता और संभालता है तथा प्रश्न, नियम और बैकअप तय करता है।`,`માલિક સેટઅપ. એ સેટઅપ કોડ ટાઇપ કરો જે ફક્ત માલિક જાણે છે. સુપરએડમિન દરેક અન્ય લૉગિન (યુઝર, સંશોધક) બનાવે અને સંભાળે છે તથા પ્રશ્નો, નિયમો અને બૅકઅપ નક્કી કરે છે.`],
+[`Setup Code`,`सेटअप कोड`,`સેટઅપ કોડ`],
+[`I am the owner - set up the Superadmin`,`मैं स्वामी हूँ – सुपरएडमिन सेट करें`,`હું માલિક છું – સુપરએડમિન સેટ કરો`],
+[`Back`,`वापस`,`પાછા`],
+[`That Setup Code is not correct.`,`वह सेटअप कोड सही नहीं है।`,`તે સેટઅપ કોડ સાચો નથી.`],
+[`A Superadmin already exists on this device.`,`इस उपकरण पर सुपरएडमिन पहले से है।`,`આ ઉપકરણ પર સુપરએડમિન પહેલેથી છે.`],
+[`Or bring my logins from another browser (logins file)`,`या मेरे लॉगिन दूसरे ब्राउज़र से लाएँ (लॉगिन फ़ाइल)`,`અથવા મારાં લૉગિન બીજા બ્રાઉઝરથી લાવો (લૉગિન ફાઇલ)`],
+[`File password`,`फ़ाइल पासवर्ड`,`ફાઇલ પાસવર્ડ`],
+[`Import my logins`,`मेरे लॉगिन आयात करें`,`મારાં લૉગિન આયાત કરો`],
+[`Logins file - move my logins to another browser`,`लॉगिन फ़ाइल – मेरे लॉगिन दूसरे ब्राउज़र में ले जाएँ`,`લૉગિન ફાઇલ – મારાં લૉગિન બીજા બ્રાઉઝરમાં લઈ જાઓ`],
+[`A protected file with every login and its level (passwords stay as hashes). Import it in your other browser on the owner setup screen, or here while signed in as Superadmin. Charts and research move with the Backup file, not with this one.`,`हर लॉगिन और उसके स्तर वाली सुरक्षित फ़ाइल (पासवर्ड हैश रूप में रहते हैं)। इसे अपने दूसरे ब्राउज़र की स्वामी सेटअप स्क्रीन पर, या यहाँ सुपरएडमिन के रूप में साइन-इन रहते आयात करें। कुंडलियाँ और शोध बैकअप फ़ाइल से जाते हैं, इससे नहीं।`,`દરેક લૉગિન અને તેના સ્તર સાથેની સુરક્ષિત ફાઇલ (પાસવર્ડ હેશ રૂપે રહે છે). તેને તમારા બીજા બ્રાઉઝરની માલિક સેટઅપ સ્ક્રીન પર, અથવા અહીં સુપરએડમિન તરીકે સાઇન-ઇન હોય ત્યારે આયાત કરો. કુંડળીઓ અને સંશોધન બૅકઅપ ફાઇલથી જાય છે, આનાથી નહીં.`],
+[`Export logins file`,`लॉगिन फ़ाइल निर्यात करें`,`લૉગિન ફાઇલ નિકાસ કરો`],
+[`Logins file`,`लॉगिन फ़ाइल`,`લૉગિન ફાઇલ`],
+[`Import logins file`,`लॉगिन फ़ाइल आयात करें`,`લૉગિન ફાઇલ આયાત કરો`],
+[`Logins file downloaded. Keep its password safe - it cannot be recovered. It holds every login, its level and its password check.`,`लॉगिन फ़ाइल डाउनलोड हुई। इसका पासवर्ड सुरक्षित रखें – इसे वापस नहीं पाया जा सकता। इसमें हर लॉगिन, उसका स्तर और उसकी पासवर्ड-जाँच है।`,`લૉગિન ફાઇલ ડાઉનલોડ થઈ. તેનો પાસવર્ડ સુરક્ષિત રાખો – તે પાછો મેળવી શકાતો નથી. તેમાં દરેક લૉગિન, તેનું સ્તર અને તેની પાસવર્ડ-ચકાસણી છે.`],
+[`Choose the logins file first.`,`पहले लॉगिन फ़ाइल चुनें।`,`પહેલાં લૉગિન ફાઇલ પસંદ કરો.`],
+[`Type the file password.`,`फ़ाइल पासवर्ड टाइप करें।`,`ફાઇલ પાસવર્ડ ટાઇપ કરો.`],
+[`Wrong password, or the file is damaged. Nothing was changed.`,`पासवर्ड गलत है, या फ़ाइल खराब है। कुछ नहीं बदला गया।`,`પાસવર્ડ ખોટો છે, અથવા ફાઇલ બગડેલી છે. કંઈ બદલાયું નથી.`],
+[`This file has no Superadmin login.`,`इस फ़ाइल में कोई सुपरएडमिन लॉगिन नहीं है।`,`આ ફાઇલમાં કોઈ સુપરએડમિન લૉગિન નથી.`]
+]);
+addTrP([
+[/^Imported (\d+) login\(s\)(?:, (\d+) already present and skipped)?\.$/,`$1 लॉगिन आयात किए गए।`,`$1 લૉગિન આયાત કર્યા.`],
+[/^Logins imported \((\d+)\)\. Sign in with your usual password\.$/,`लॉगिन आयात हुए ($1)। अपने सामान्य पासवर्ड से साइन-इन करें।`,`લૉગિન આયાત થયાં ($1). તમારા સામાન્ય પાસવર્ડથી સાઇન-ઇન કરો.`],
+[/^That Setup Code is not correct\. Too many wrong attempts\. Try again in (.+)\.$/,`वह सेटअप कोड सही नहीं है। बहुत अधिक गलत प्रयास। $1 बाद फिर कोशिश करें।`,`તે સેટઅપ કોડ સાચો નથી. ઘણા ખોટા પ્રયાસ. $1 પછી ફરી પ્રયત્ન કરો.`]
+]);addTrX([
+[`Account type`,`खाते का प्रकार`,`ખાતાનો પ્રકાર`],
+[`User - active at once`,`यूज़र – तुरंत सक्रिय`,`યુઝર – તરત સક્રિય`],
+[`Researcher - starts after the Superadmin activates it`,`शोधकर्ता – सुपरएडमिन द्वारा सक्रिय करने के बाद शुरू`,`સંશોધક – સુપરએડમિન સક્રિય કરે પછી શરૂ`],
+[`Account rules`,`खाते के नियम`,`ખાતાના નિયમો`],
+[`AppstroSutras is free software. Logins are provided free of charge, as they are, with no guarantee of access. The developer and the Superadmin may suspend, ban, change the level of, or delete any login at any time, with or without prior notice or reason, and may change or withdraw features. A User account is active at once. A Researcher account starts working only after the Superadmin activates it. Keep your own backup of anything you want to keep.`,`AppstroSutras निःशुल्क सॉफ़्टवेयर है। लॉगिन निःशुल्क, जैसे हैं वैसे, पहुँच की किसी गारंटी के बिना दिए जाते हैं। डेवलपर और सुपरएडमिन किसी भी समय, पूर्व सूचना या कारण के साथ या बिना, किसी भी लॉगिन को निलंबित, प्रतिबंधित, उसका स्तर बदल या हटा सकते हैं, और सुविधाएँ बदल या वापस ले सकते हैं। यूज़र खाता तुरंत सक्रिय होता है। शोधकर्ता खाता सुपरएडमिन द्वारा सक्रिय करने के बाद ही काम करता है। जो कुछ सहेजकर रखना चाहें उसका अपना बैकअप रखें।`,`AppstroSutras મફત સૉફ્ટવેર છે. લૉગિન મફત, જેવા છે તેવા, પહોંચની કોઈ ગૅરંટી વિના આપવામાં આવે છે. ડેવલપર અને સુપરએડમિન કોઈ પણ સમયે, આગોતરી સૂચના કે કારણ સાથે અથવા વિના, કોઈ પણ લૉગિનને સસ્પેન્ડ, પ્રતિબંધિત, તેનું સ્તર બદલી કે કાઢી શકે છે, અને સુવિધાઓ બદલી કે પાછી ખેંચી શકે છે. યુઝર ખાતું તરત સક્રિય થાય છે. સંશોધક ખાતું સુપરએડમિન સક્રિય કરે પછી જ કામ કરે છે. જે કંઈ રાખવું હોય તેનું પોતાનું બૅકઅપ રાખો.`],
+[`I have read and accept the account rules`,`मैंने खाते के नियम पढ़ लिए हैं और स्वीकार करता/करती हूँ`,`મેં ખાતાના નિયમો વાંચ્યા છે અને સ્વીકારું છું`],
+[`Free software: the developer and the Superadmin may suspend, ban or delete any login at any time without prior notice.`,`निःशुल्क सॉफ़्टवेयर: डेवलपर और सुपरएडमिन किसी भी समय बिना पूर्व सूचना के किसी भी लॉगिन को निलंबित, प्रतिबंधित या हटा सकते हैं।`,`મફત સૉફ્ટવેર: ડેવલપર અને સુપરએડમિન કોઈ પણ સમયે આગોતરી સૂચના વિના કોઈ પણ લૉગિનને સસ્પેન્ડ, પ્રતિબંધિત કે કાઢી શકે છે.`],
+[`Please tick that you accept the account rules.`,`कृपया निशान लगाएँ कि आप खाते के नियम स्वीकार करते हैं।`,`કૃપા કરીને ટીક કરો કે તમે ખાતાના નિયમો સ્વીકારો છો.`],
+[`Your Researcher account has been created. It starts working once the Superadmin activates it.`,`आपका शोधकर्ता खाता बन गया है। सुपरएडमिन द्वारा सक्रिय करते ही यह काम करने लगेगा।`,`તમારું સંશોધક ખાતું બની ગયું છે. સુપરએડમિન સક્રિય કરે કે તરત તે કામ કરશે.`],
+[`Your Researcher account is waiting for the Superadmin to activate it.`,`आपका शोधकर्ता खाता सुपरएडमिन द्वारा सक्रिय किए जाने की प्रतीक्षा में है।`,`તમારું સંશોધક ખાતું સુપરએડમિન દ્વારા સક્રિય થવાની રાહ જુએ છે.`],
+[`These people asked for a Researcher account. They cannot sign in until you approve. Reject removes the request.`,`इन लोगों ने शोधकर्ता खाता माँगा है। आपके स्वीकृत करने तक ये साइन-इन नहीं कर सकते। अस्वीकार करने पर अनुरोध हट जाता है।`,`આ લોકોએ સંશોધક ખાતું માંગ્યું છે. તમે મંજૂર કરો ત્યાં સુધી તેઓ સાઇન-ઇન કરી શકતા નથી. નામંજૂર કરવાથી વિનંતી દૂર થાય છે.`],
+[`Asked for`,`माँगा`,`માંગ્યું`],
+[`Approve`,`स्वीकृत करें`,`મંજૂર કરો`],
+[`Reject`,`अस्वीकार करें`,`નામંજૂર કરો`],
+[`waiting for approval`,`स्वीकृति की प्रतीक्षा में`,`મંજૂરીની રાહમાં`],
+[`Switch off bans a login; Delete removes it. Both can be done at any time, without notice.`,`बंद करने से लॉगिन प्रतिबंधित होता है; हटाने से मिट जाता है। दोनों किसी भी समय, बिना सूचना किए जा सकते हैं।`,`બંધ કરવાથી લૉગિન પ્રતિબંધિત થાય છે; કાઢવાથી તે દૂર થાય છે. બંને કોઈ પણ સમયે, સૂચના વિના થઈ શકે છે.`]
+]);
+addTrP([
+[/^Waiting for your approval \((\d+)\)$/,`आपकी स्वीकृति की प्रतीक्षा ($1)`,`તમારી મંજૂરીની રાહ ($1)`],
+[/^“(.+)” is approved and can sign in as a Researcher now\.$/,`“$1” स्वीकृत हुआ और अब शोधकर्ता के रूप में साइन-इन कर सकता है।`,`“$1” મંજૂર થયું અને હવે સંશોધક તરીકે સાઇન-ઇન કરી શકે છે.`],
+[/^The request of “(.+)” was rejected and removed\.$/,`“$1” का अनुरोध अस्वीकार कर हटा दिया गया।`,`“$1” ની વિનંતી નામંજૂર કરી દૂર કરી.`]
+]);addTrX([
+[`Superadmin - owner only, needs the Setup Code`,`सुपरएडमिन – केवल स्वामी, सेटअप कोड चाहिए`,`સુપરએડમિન – ફક્ત માલિક, સેટઅપ કોડ જોઈએ`]
+]);addTrX([
+[`Sign in as`,`इस रूप में साइन-इन करें`,`આ તરીકે સાઇન-ઇન કરો`]
+]);
+addTrP([
+[/^This login is a (.+) account\. It is now selected in “Sign in as” - press Sign in again\.$/,`यह लॉगिन $1 खाता है। अब यह “इस रूप में साइन-इन करें” में चुन लिया गया है – फिर से साइन-इन दबाएँ।`,`આ લૉગિન $1 ખાતું છે. હવે તે “આ તરીકે સાઇન-ઇન કરો” માં પસંદ થઈ ગયું છે – ફરી સાઇન-ઇન દબાવો.`]
 ]);
 /* ---------- Predictive Simulator – Hindi and Gujarati, part 1: screen labels, Self-Exam, Question Mode ---------- */
 addTrX([
